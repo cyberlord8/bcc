@@ -15,12 +15,15 @@ VDD_ADC = 1.8 #voltage divider input voltage
 AIN_MIN = .7 #minimum voltage used during self test - will adjust as needed
 AIN_MAX = 1.3 #maximum voltage used during self test - will adjust as needed
 
+######### GLOBAL VARIABLE START HERE ##############################
 #other global variables
-USE_CELSIUS = 0 #set to 0 to use fahrenheit
-HEATER_ON = 0 #initialize HEATER_ON to False
-COOLER_ON = 0 #initialize COOLER_ON to false
+USE_CELSIUS = False #set to 0 to use fahrenheit
+HEATER_ON = False #initialize HEATER_ON to False
+COOLER_ON = False #initialize COOLER_ON to false
 DESIRED_TEMP = 78 #set initial desired temp
 DWELL = 2 #set initial dwell temp range
+TIME_LAST_COOLER = 0 #variable to track when cooler was last turned off
+COOLER_TIME = 5 * 60 #5 minutes * 60 seconds
 
 #thermistor constants used in polynomial equation
 T_a = 7.602330993E-4
@@ -31,6 +34,8 @@ T_c = 7.172007260E-8
 ADC.setup() #setup ADC pins
 GPIO.setup("P9_15", GPIO.OUT) #setup pin P9_48 as output pin HEATER
 GPIO.setup("P9_23", GPIO.OUT) #setup pin P9_49 as output pin COOLER
+
+######### FUNCTIONS START HERE #####################################
 
 #self test function to check AIN0 voltage is w/in normal range and GPIO pins/LEDs are working
 #we use a function so we can call this code at a later time if we want
@@ -61,7 +66,6 @@ def self_test():
   return
 
 #calculate temperature function
-
 def calculate_temperature():
     #define global variables
     global VDD_ADC, R_BIAS, c2kelvin, T_a, T_b, T_c, USE_CELSIUS
@@ -80,34 +84,44 @@ def calculate_temperature():
     if USE_CELSIUS: return temp_celsius
     else: return temp_fahren
 
+#heater control function
 def heater_control(current_temperature):
     global HEATER_ON, DESIRED_TEMP, DWELL
     if current_temperature < DESIRED_TEMP - DWELL:
       if not HEATER_ON:
-        HEATER_ON = True
-        print "Turning heater on\n\n"
-        GPIO.output("P9_15",GPIO.HIGH)
+          HEATER_ON = True
+          print "Turning heater on\n\n"
+          GPIO.output("P9_15",GPIO.HIGH)
     elif HEATER_ON:
       HEATER_ON = False
       print "Turning heater off\n\n"
       GPIO.output("P9_15",GPIO.LOW)
     return
 
+#cooler control function
 def cooler_control(current_temperature):
-    global COOLER_ON, DESIRED_TEMP, DWELL
+    global COOLER_ON, DESIRED_TEMP, DWELL, TIME_LAST_COOLER, COOLER_TIME
     if current_temperature > DESIRED_TEMP + DWELL:
-      if not COOLER_ON:
-        COOLER_ON = True
-        print "Turning cooler on\n\n"
-        GPIO.output("P9_23",GPIO.HIGH)
+      if time.time() - TIME_LAST_COOLER > COOLER_TIME:#has it been more than 5 minutes?
+        if not COOLER_ON:
+          COOLER_ON = True
+          print "Turning cooler on\n\n"
+          GPIO.output("P9_23",GPIO.HIGH)
+      else: print "Cooler can't turn on yet", 300 - (time.time() - TIME_LAST_COOLER),"seconds left\n\n"
     elif COOLER_ON:
       COOLER_ON = False
       print "Turning cooler off\n\n"
       GPIO.output("P9_23",GPIO.LOW)
+      TIME_LAST_COOLER = time.time()#reset cooler timer
     return
+
+########### MAIN PROGRAM STARTS HERE #####################################
 
 self_test()
 
+print "Press CTRL-C to exit program\n\n"
+
+#main program loop
 while True:
 
     #call the calculate temperature function and assign the results to current temperature
