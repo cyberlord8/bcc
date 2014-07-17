@@ -3,7 +3,7 @@ bcc
 
 Beer brew chamber temperature contoller code for Beaglebone Black
 
-A project of mine I want to share with the maker/hacker communityllow homebrewers.
+A project of mine I want to share with the maker/hacker community and fellow homebrewers.
 
 http://mybbbprojects.blogspot.com/2014/07/introduction.html
 
