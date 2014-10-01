@@ -1,0 +1,23 @@
+Version History
+~~~~~~~~~~~~~~~
+
+
+
+#0.02a (01 Oct 2014)
+
+- Added a menu so desired temperature and dwell can be set on the fly
+- Updated the trending so it averages the last 4 readings (1 minutes worth)
+
+
+
+#0.01a (23 Sep 2014)
+
+- Added a title
+- Used ASCII escape sequences to position the text on the screen... eliminated scrolling text
+
+
+
+#Original contribution (14 Jul 2014)
+
+- Basic program functionality
+- Reads temperature and turns LEDs on/off as desired
