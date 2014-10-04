@@ -1,6 +1,14 @@
 Version History
 ~~~~~~~~~~~~~~~
 
+#0.03a ()
+
+- Added beginnings of an alarm system
+- Added exception handling to user input
+- Added ability to switch between C/F scales
+- Added a screen refresh in case it gets messed up
+- Added beginnings of the automated brewing system
+
 
 
 #0.02a (01 Oct 2014)

@@ -1,0 +1,35 @@
+A list of things to do for the bcc project. The number in parenthesis is the priority.
+
+
+* (1)Alarms:
+	- X Over temp
+	- X Under temp	
+	- _ Cooler on but not cooling
+	- _ Heater on but not heating
+
+* (1)Save settings to file
+
+
+* (2)Database
+	- _ Save readings
+	- _ Document when settings changed
+	- _ Yeast strains and recommended temperatures
+	- _ Beer styles 
+
+
+* (2)Select brew process from menu
+	- X Start Normal Ferment
+	- X Start Cold Crash
+	- X Start Lager 
+	- X Start Clearing
+	- X Start Warm Ferment
+	- X Cycle Off
+
+
+* (2)Automate Brew Process
+
+
+* (5)Web Interface Control
+
+
+* (8)GUI Interface Control
