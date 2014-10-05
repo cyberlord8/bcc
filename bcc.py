@@ -9,7 +9,8 @@ import select
 
 ######### GLOBAL VARIABLE START HERE ##############################
 #set version number
-VERSION = "v0.03a"
+#major release . minor release . bugfix
+VERSION = "v0.03.1a"
 
 #set Celsius to kelvin constant
 c2kelvin = 273.15
@@ -578,11 +579,21 @@ def min_max():
 
 #check alarms###########################################################
 def check_alarms():
-  global IS_ALARM,ALARM_HIGH_TEMP,ALARM_LOW_TEMP,ALARM_COOLER_MALFUNC,ALARM_HEATER_MALFUNC, MAX_HIGH_TEMP,MIN_LOW_TEMP,TIME_BEFORE_ALARM_TRIGGER
+  global IS_ALARM,ALARM_HIGH_TEMP,ALARM_LOW_TEMP,ALARM_COOLER_MALFUNC,ALARM_HEATER_MALFUNC, MAX_HIGH_TEMP,MIN_LOW_TEMP,TIME_BEFORE_ALARM_TRIGGER,BREW_CYCLE
 
 #exit function if program has just started
   if time.time() - PROGRAM_START_TIME < 60:
     print "\033[24;35H\033[93mOFF\033[39m"
+    return
+
+  if BREW_CYCLE == "Off  ":
+    IS_ALARM = False
+    ALARM_LOW_TEMP = False
+    ALARM_HIGH_TEMP = False
+    print "\033[24;35HOFF"
+
+    display_alarm()
+
     return
 
   print "\033[24;35H\033[32mON \033[39m"

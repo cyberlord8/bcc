@@ -1,7 +1,13 @@
 Version History
 ~~~~~~~~~~~~~~~
 
-#0.03a ()
+#0.03.01a (05 Oct 2014)
+
+- Fixed slight bug with alarm system indicating an alarm when cycle is off.
+
+
+
+#0.03a (04 Oct 2014)
 
 - Added beginnings of an alarm system
 - Added exception handling to user input
