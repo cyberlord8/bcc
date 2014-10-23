@@ -3,6 +3,8 @@ bcc
 
 Beer brew chamber temperature contoller code for Beaglebone Black
 
+License: http://opensource.org/licenses/GPL-3.0
+
 A project of mine I want to share with the maker/hacker community and fellow homebrewers.
 
 http://mybbbprojects.blogspot.com/2014/07/introduction.html
@@ -34,14 +36,17 @@ OTHER THINGS TO MONITOR
     ( )Monitor fermentation vessel temperature
         ( )Chart vessel/chamber temperature differential
     ( )Web cam for visual monitoring
+    ( )Monitor fluid level in airlock system
     ( )CO2 off gassing
         ( )Monitor rate of fermentation
         ( )Determine when fermentation is complete
-    ( )Monitor  power consumption
+    ( )Monitor power consumption
     ( )Monitor keg pressures
     ( )Monitor external/room temperature 
     ( )Monitor humidity (still not sure on this)
 
 LOCAL INPUT GUI DEVICE
 
-    ( )Local LCD touchscreen GUI (doubles the expense but gives a nice professional finishing touch)
+    ( )Local LCD touchscreen GUI 
+       (doubles the expense but gives a nice 
+        professional finishing touch)

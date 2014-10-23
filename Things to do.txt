@@ -1,13 +1,32 @@
 A list of things to do for the bcc project. The number in parenthesis is the priority.
 
+* (1)Bug Fixes
+	- X Fix Celsius to Fahrenheit formula
 
 * (1)Alarms:
 	- X Over temp
 	- X Under temp	
 	- _ Cooler on but not cooling
 	- _ Heater on but not heating
+	- _ Send alarm texts or emails
+
 
 * (1)Save settings to file
+	- X  TEMP_SCALE
+	- X  LAGER_TEMP
+	- X  WARM_TEMP
+	- X  NORM_TEMP
+	- X  CRASH_TEMP
+	- X  CLEAR_TEMP
+	- X  DESIRED_TEMP
+	- X  DWELL
+	- X  MAX_HIGH_TEMP
+	- X  MIN_LOW_TEMP
+	- X  MIN_TEMP
+	- X  MAX_TEMP
+	- X  BREW_CYCLE
+	- _  BREW_NAME
+	- _  BREW_STYLE
 
 
 * (2)Database
@@ -26,10 +45,12 @@ A list of things to do for the bcc project. The number in parenthesis is the pri
 	- X Cycle Off
 
 
-* (2)Automate Brew Process
+* (3)Automate Brew Process
+	- _ CO2 Sensor/Gas Pressure Sensor
 
 
 * (5)Web Interface Control
 
 
 * (8)GUI Interface Control
+	- _ LCD Panel

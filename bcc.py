@@ -1,4 +1,26 @@
 #!/usr/bin/python
+#This program is designed to run on a Beaglebone Black. 
+#You will need to install the Adafruit BBB-IO Python library.
+#
+#Licensing is as follows:
+#http://opensource.org/licenses/GPL-3.0
+"""
+    bcc.py - Beer brewing temperature controller
+    Copyright (C) 2014,  Timothy J. Millea
+
+    This program is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, version 3 of the License.
+
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with this program.  If not, see http://www.gnu.org/licenses.
+"""
+
 #import the libraries we will use in our program
 import Adafruit_BBIO.ADC as ADC
 import Adafruit_BBIO.GPIO as GPIO
@@ -7,10 +29,13 @@ import math
 import sys
 import select
 
+#read in the settings file
+from bccconfig import *
+
 ######### GLOBAL VARIABLE START HERE ##############################
 #set version number
 #major release . minor release . bugfix
-VERSION = "v0.03.1a"
+VERSION = "v0.04.0a"
 
 #set Celsius to kelvin constant
 c2kelvin = 273.15
@@ -29,10 +54,6 @@ COOLER_ON = False #initialize COOLER_ON to false
 TIME_LAST_COOLER = 0 #variable to track when cooler was last turned off
 COOLER_TIME = 5 * 60 #5 minutes * 60 seconds
 
-OLD_TEMP = 0
-MIN_TEMP = 0
-MAX_TEMP = 0
-
 current_temperature = 0
 
 #alarm variables:
@@ -49,35 +70,33 @@ PROGRAM_START_TIME = time.time()
 
 #brew cycle variable
 #Off, Normal Brew, Warm Brew, Lager, Cold Crash, Clearing
-BREW_CYCLE = "Off  "
+#BREW_CYCLE = "Off  "
 
-USE_CELSIUS = False #set to 0 to use Fahrenheit
-
-
-if USE_CELSIUS:
-  TEMP_SCALE = "Celsius"
-  LAGER_TEMP = 7
-  WARM_TEMP = 21
-  NORM_TEMP = 18
-  CRASH_TEMP = 2
-  CLEAR_TEMP = 10
-  DESIRED_TEMP = 18 #set initial desired temp
-  DWELL = 1.2 #set initial dwell temp range
+if TEMP_SCALE == "Celsius": #from import bccconfig above
+  USE_CELSIUS = True
+  #LAGER_TEMP = 7
+  #WARM_TEMP = 21
+  #NORM_TEMP = 18
+  #CRASH_TEMP = 2
+  #CLEAR_TEMP = 10
+  #DESIRED_TEMP = 18 #set initial desired temp
+  #DWELL = 1.2 #set initial dwell temp range
   #alarm threshold variables:
-  MAX_HIGH_TEMP = 24
-  MIN_LOW_TEMP = 1
-else:
-  TEMP_SCALE = "Fahrenheit"
-  LAGER_TEMP = 45
-  WARM_TEMP = 70
-  NORM_TEMP = 65
-  CRASH_TEMP = 35
-  CLEAR_TEMP = 50
-  DESIRED_TEMP = 65 #set initial desired temp
-  DWELL = 2.5 #set initial dwell temp range
+#  MAX_HIGH_TEMP = 24
+#  MIN_LOW_TEMP = 1
+
+elif TEMP_SCALE == "Fahrenheit":
+  USE_CELSIUS = False
+  #LAGER_TEMP = 45
+  #WARM_TEMP = 70
+  #NORM_TEMP = 65
+  #CRASH_TEMP = 35
+  #CLEAR_TEMP = 50
+  #DESIRED_TEMP = 65 #set initial desired temp
+  #DWELL = 2.5 #set initial dwell temp range
   #alarm threshold variables:
-  MAX_HIGH_TEMP = 75
-  MIN_LOW_TEMP = 34
+#  MAX_HIGH_TEMP = 75
+#  MIN_LOW_TEMP = 34
 
 #thermistor constants used in polynomial equation
 T_a = 7.602330993E-4
@@ -143,61 +162,68 @@ def check_input():
   return
 
 def switch_scale():
-  global USE_CELSIUS,LAGER_TEMP,WARM_TEMP,NORM_TEM,CRASH_TEMP,CLEAR_TEMP,DESIRED_TEMP,DWELL,MAX_HIGH_TEMP
+  global USE_CELSIUS,LAGER_TEMP,WARM_TEMP,NORM_TEMP,CRASH_TEMP,CLEAR_TEMP,DESIRED_TEMP,DWELL,MAX_HIGH_TEMP
   global MIN_LOW_TEMP,MAX_TEMP,MIN_TEMP,TEMP_SCALE,current_temperature
 
   if USE_CELSIUS: #switch to Fahrenheit
     USE_CELSIUS = False
     TEMP_SCALE = "Fahrenheit"
-    MAX_TEMP = (MAX_TEMP * 9/5) + 32
-    MIN_TEMP = (MIN_TEMP * 9/5) + 32
-    O_trending.temp1 = (O_trending.temp1 * 9/5) + 32
-    O_trending.temp2 = (O_trending.temp2 * 9/5) + 32
-    O_trending.temp3 = (O_trending.temp3 * 9/5) + 32
-    O_trending.temp4 = (O_trending.temp4 * 9/5) + 32
-    O_trending.moving_avg_temp = (O_trending.moving_avg_temp * 9/5) + 32
-    current_temperature = (current_temperature * 9/5) + 32
+    MAX_TEMP = (MAX_TEMP * 9.0/5.0) + 32
+    MIN_TEMP = (MIN_TEMP * 9.0/5.0) + 32
+    O_trending.temp1 = (O_trending.temp1 * 9.0/5.0) + 32
+    O_trending.temp2 = (O_trending.temp2 * 9.0/5.0) + 32
+    O_trending.temp3 = (O_trending.temp3 * 9.0/5.0) + 32
+    O_trending.temp4 = (O_trending.temp4 * 9.0/5.0) + 32
+    O_trending.moving_avg_temp = (O_trending.moving_avg_temp * 9.0/5.0) + 32
+    current_temperature = (current_temperature * 9.0/5.0) + 32
   else: 
     USE_CELSIUS = True #else switch to Celsius
     TEMP_SCALE = "Celsius"
-    MAX_TEMP = (MAX_TEMP -32) * 5 / 9
-    MIN_TEMP = (MIN_TEMP -32) * 5 / 9
-    O_trending.temp1 = (O_trending.temp1 -32) * 5 / 9
-    O_trending.temp2 = (O_trending.temp2 -32) * 5 / 9
-    O_trending.temp3 = (O_trending.temp3 -32) * 5 / 9
-    O_trending.temp4 = (O_trending.temp4 -32) * 5 / 9
-    O_trending.moving_avg_temp = (O_trending.moving_avg_temp -32) * 5 / 9
-    current_temperature = (current_temperature -32) * 5 / 9
+    MAX_TEMP = (MAX_TEMP -32) * 5.0 / 9.0
+    MIN_TEMP = (MIN_TEMP -32) * 5.0 / 9.0
+    O_trending.temp1 = (O_trending.temp1 -32) * 5.0 / 9.0
+    O_trending.temp2 = (O_trending.temp2 -32) * 5.0 / 9.0
+    O_trending.temp3 = (O_trending.temp3 -32) * 5.0 / 9.0
+    O_trending.temp4 = (O_trending.temp4 -32) * 5.0 / 9.0
+    O_trending.moving_avg_temp = (O_trending.moving_avg_temp -32) * 5.0 / 9.0
+    current_temperature = (current_temperature -32) * 5.0 / 9.0
 
 
   if USE_CELSIUS:
-    LAGER_TEMP = 7
-    WARM_TEMP = 21
-    NORM_TEMP = 18
-    CRASH_TEMP = 2
-    CLEAR_TEMP = 10
-    DESIRED_TEMP = (DESIRED_TEMP -32) * 5 / 9
-    DWELL = 1.2
-    MAX_HIGH_TEMP = 24
-    MIN_LOW_TEMP = 1
+    LAGER_TEMP = (LAGER_TEMP -32) * 5.0 / 9.0
+    WARM_TEMP = (WARM_TEMP -32) * 5.0 / 9.0
+    NORM_TEMP = (NORM_TEMP -32) * 5.0 / 9.0
+    CRASH_TEMP = (CRASH_TEMP -32) * 5.0 / 9.0
+    CLEAR_TEMP = (CLEAR_TEMP -32) * 5.0 / 9.0
+    DESIRED_TEMP = (DESIRED_TEMP -32) * 5.0 / 9.0
+    MAX_HIGH_TEMP = (MAX_HIGH_TEMP -32) * 5.0 / 9.0
+    MIN_LOW_TEMP = (MIN_LOW_TEMP -32) * 5.0 / 9.0
   else:
-    LAGER_TEMP = 45
-    WARM_TEMP = 70
-    NORM_TEMP = 65
-    CRASH_TEMP = 35
-    CLEAR_TEMP = 50
-    DESIRED_TEMP = (DESIRED_TEMP * 9/5) + 32
-    DWELL = 2.5
-    MAX_HIGH_TEMP = 75
-    MIN_LOW_TEMP = 34
+    LAGER_TEMP = (LAGER_TEMP * 9.0/5.0) + 32
+    WARM_TEMP = (WARM_TEMP * 9.0/5.0) + 32
+    NORM_TEMP = (NORM_TEMP * 9.0/5.0) + 32
+    CRASH_TEMP = (CRASH_TEMP * 9.0/5.0) + 32
+    CLEAR_TEMP = (CLEAR_TEMP * 9.0/5.0) + 32
+    DESIRED_TEMP = (DESIRED_TEMP * 9.0/5.0) + 32
+    MAX_HIGH_TEMP = (MAX_HIGH_TEMP * 9.0/5.0) + 32
+    MIN_LOW_TEMP = (MIN_LOW_TEMP * 9.0/5.0) + 32
+
+  print "\033[25;20H|  H",round(MAX_HIGH_TEMP,0),"| L",round(MIN_LOW_TEMP,0) 
 
   return
 
 #off cycle#######################################################
 def brew_off():
-  global BREW_CYCLE,DESIRED_TEMP,MAX_HIGH_TEMP,MIN_LOW_TEMP
+  global BREW_CYCLE,DESIRED_TEMP,MAX_HIGH_TEMP,MIN_LOW_TEMP,USE_CELSIUS,TIME_LAST_COOLER,COOLER_ON
 
-  BREW_CYCLE = "Off  "
+  if BREW_CYCLE == "Off ": pass
+  else:
+    BREW_CYCLE = "Off  "
+    if COOLER_ON:
+      COOLER_ON = False
+      GPIO.output("P9_23",GPIO.LOW)
+      print "\033[25;0H\033[93m Cooler: OFF\033[0m"
+      TIME_LAST_COOLER = time.time()#reset cooler timer
 
   if USE_CELSIUS:
     DESIRED_TEMP = 18
@@ -212,7 +238,7 @@ def brew_off():
 
 #clear cycle#######################################################
 def clear_brew():
-  global BREW_CYCLE,DESIRED_TEMP,MAX_HIGH_TEMP,MIN_LOW_TEMP
+  global BREW_CYCLE,DESIRED_TEMP,MAX_HIGH_TEMP,MIN_LOW_TEMP,USE_CELSIUS
 
   BREW_CYCLE = "Clear"
 
@@ -229,7 +255,7 @@ def clear_brew():
 
 #normal cycle#######################################################
 def normal_brew():
-  global BREW_CYCLE,DESIRED_TEMP,MAX_HIGH_TEMP,MIN_LOW_TEMP
+  global BREW_CYCLE,DESIRED_TEMP,MAX_HIGH_TEMP,MIN_LOW_TEMP,USE_CELSIUS
 
   BREW_CYCLE = "Norm "
 
@@ -263,7 +289,7 @@ def crash_brew():
 
 #warm cycle#######################################################
 def warm_brew():
-  global BREW_CYCLE,DESIRED_TEMP,MAX_HIGH_TEMP,MIN_LOW_TEMP
+  global BREW_CYCLE,DESIRED_TEMP,MAX_HIGH_TEMP,MIN_LOW_TEMP,USE_CELSIUS
 
   BREW_CYCLE = "Warm "
 
@@ -280,7 +306,7 @@ def warm_brew():
 
 #lager cycle#######################################################
 def lager():
-  global BREW_CYCLE,DESIRED_TEMP,MAX_HIGH_TEMP,MIN_LOW_TEMP
+  global BREW_CYCLE,DESIRED_TEMP,MAX_HIGH_TEMP,MIN_LOW_TEMP,USE_CELSIUS
 
   BREW_CYCLE = "Lager"
 
@@ -359,10 +385,14 @@ def set_desired_temp():
 
 #exit program######################################################
 def exit_program():
-  print "\033[16;0HExiting program..."
+  print "\033[15;0H"
 
   #do some shutdown stuff here if desired
+  print "Writing settings to file..."
+  write_settings()
 
+
+  print "Exiting program..."
   time.sleep(2)
   exit(0)
 
@@ -443,7 +473,7 @@ def calculate_temperature():
     #calculate temperature in kelvin
     temp_kelvin = 1/(T_a + T_b * math.log(res_therm) + T_c * pow(math.log(res_therm),3))
     temp_celsius = temp_kelvin - c2kelvin
-    temp_fahren = (temp_celsius * 9/5) + 32
+    temp_fahren = (temp_celsius * 9.0/5.0) + 32
 
     if USE_CELSIUS: return temp_celsius
     else: return temp_fahren
@@ -577,6 +607,15 @@ def min_max():
 
   return
 
+#reset min and max temperatures#########################################
+def reset_min_max():
+  global MAX_TEMP, MIN_TEMP
+
+  MIN_TEMP = 0
+  MAX_TEMP = 0
+
+  return
+
 #check alarms###########################################################
 def check_alarms():
   global IS_ALARM,ALARM_HIGH_TEMP,ALARM_LOW_TEMP,ALARM_COOLER_MALFUNC,ALARM_HEATER_MALFUNC, MAX_HIGH_TEMP,MIN_LOW_TEMP,TIME_BEFORE_ALARM_TRIGGER,BREW_CYCLE
@@ -619,7 +658,7 @@ def check_alarms():
 
   display_alarm()
 
-  print "\033[25;20H|  HT:",MAX_HIGH_TEMP,"| LT:",MIN_LOW_TEMP 
+  print "\033[25;20H|  H",round(MAX_HIGH_TEMP,0),"| L",round(MIN_LOW_TEMP,0) 
 
   return
 
@@ -670,7 +709,7 @@ def draw_screen():
 
   print "\033[23;20H\033[0K| --=Alarm Status=--"
   print "\033[24;20H\033[0K|  System:"
-  print "\033[25;20H\033[0K|  HT:",MAX_HIGH_TEMP,"| LT:",MIN_LOW_TEMP 
+  print "\033[25;20H\033[0K|  H",round(MAX_HIGH_TEMP,0),"| L",round(MIN_LOW_TEMP,0) 
   print "\033[26;20H\033[0K|  High Temp:  OFF"
   print "\033[27;20H\033[0K|  Low Temp:   OFF"
   print "\033[28;20H\033[0K|  Malfunc:    OFF"
@@ -718,11 +757,33 @@ def print_output():
   print "\033[27;71H",round(O_trending.temp4,1)
   print "\033[28;71H",round(O_trending.moving_avg_temp,1)
 
-  print "\033[24;88H\033[0K",DWELL
+  print "\033[24;88H\033[0K",round(DWELL,1)
   return
 
+def write_settings():
+
+  settings_file = open("bccconfig.py", "w")
+
+  settings_file.write("TEMP_SCALE = '" + TEMP_SCALE + "'\n")
+  settings_file.write("LAGER_TEMP = " + str(LAGER_TEMP) + "\n")
+  settings_file.write("WARM_TEMP = " + str(WARM_TEMP) + "\n")
+  settings_file.write("NORM_TEMP = " + str(NORM_TEMP) + "\n")
+  settings_file.write("CRASH_TEMP =" + str(CRASH_TEMP) + "\n")
+  settings_file.write("CLEAR_TEMP =" + str(CLEAR_TEMP) + "\n")
+  settings_file.write("DESIRED_TEMP = " + str(DESIRED_TEMP) + "\n")
+  settings_file.write("DWELL = " + str(DWELL) + "\n")
+  settings_file.write("MAX_HIGH_TEMP = " + str(MAX_HIGH_TEMP) + "\n")
+  settings_file.write("MIN_LOW_TEMP = " + str(MIN_LOW_TEMP) + "\n")
+  settings_file.write("MIN_TEMP = " + str(MIN_TEMP) + "\n")
+  settings_file.write("MAX_TEMP = " + str(MAX_TEMP) + "\n")
+  settings_file.write("BREW_CYCLE = '" + str(BREW_CYCLE) + "'\n")
+
+  settings_file.close()
+
+  return
 ########### MAIN PROGRAM STARTS HERE #####################################
 self_test()
+
 draw_screen()
 
 O_trending = Trend()

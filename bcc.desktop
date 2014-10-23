@@ -1,0 +1,8 @@
+[Desktop Entry]
+Encoding=UTF-8
+Name=bcc
+TryExec=lxterminal
+Exec=lxterminal -t bcc --geometry=100x30 --working-directory=/home/slim/BBB/bcc/ -l -e 'bash -c "./su-bcc.run"'
+Icon=ac-adapter
+Type=Application
+Categories=GTK;Utility;TerminalEmulator

@@ -1,9 +1,20 @@
 Version History
 ~~~~~~~~~~~~~~~
 
+#0.04.0a
+
+- Fixed bug where the different brew cycles were not calculating properly due to global variable not being declared
+- bcc now saves current settings to a file (bccconfig.py)
+- Increased precision in F/C conversion formulas which was causing a rounding error
+- Added reset min and max temp variables function (ability to reset them for each brew session?)
+- Added GPL 3.0 license verbiage
+- Fixed bug where cycling brew cycle off and on would cause compressor to turn on and off with no 5 minute delay
+
+
+
 #0.03.01a (05 Oct 2014)
 
-- Fixed slight bug with alarm system indicating an alarm when cycle is off.
+- Fixed slight bug with alarm system indicating an alarm when brew cycle is off.
 
 
 
