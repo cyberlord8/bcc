@@ -34,7 +34,7 @@ import os
 ######### GLOBAL VARIABLE START HERE ##############################
 #set version number
 #major release . minor release . bugfix
-VERSION = "v0.05.0a"
+VERSION = "v0.05.3a"
 
 #set Celsius to kelvin constant
 c2kelvin = 273.15
@@ -242,7 +242,7 @@ def yeast_profile():
 
 def switch_scale():
   global USE_CELSIUS,LAGER_TEMP,WARM_TEMP,NORM_TEMP,CRASH_TEMP,CLEAR_TEMP,DESIRED_TEMP,DWELL,MAX_HIGH_TEMP
-  global MIN_LOW_TEMP,MAX_TEMP,MIN_TEMP,TEMP_SCALE,current_temperature
+  global MIN_LOW_TEMP,MAX_TEMP,MIN_TEMP,TEMP_SCALE,current_temperature,Y_LOW_TEMP,Y_HIGH_TEMP
 
   if USE_CELSIUS: #switch to Fahrenheit
     USE_CELSIUS = False
@@ -891,7 +891,7 @@ def draw_screen():
   print "\033[28;77H\033[0K |            "
 
   print "\033[29;0H\033[0K YEAST PROFILE"
-  print "\033[30;0H\033[0K",Y_PROF_ID,"|",Y_LAB,"|",Y_NUM,"|",Y_NAME,"|",Y_STYLE,"|",Y_LOW_TEMP,"|",Y_HIGH_TEMP
+  print "\033[30;0H\033[0K",Y_PROF_ID,"|",Y_LAB,"|",Y_NUM,"|",Y_NAME,"|",Y_STYLE,"|",round(Y_LOW_TEMP,1),"|",round(Y_HIGH_TEMP,1)
   print "\033[31;0H\033[0K",Y_DESC
 
 
@@ -921,7 +921,7 @@ def print_output():
 
   print "\033[24;88H\033[0K",round(DWELL,1)
 
-  print "\033[30;0H\033[0K",Y_PROF_ID,"|",Y_LAB,"|",Y_NUM,"|",Y_NAME,"|",Y_STYLE,"|",Y_LOW_TEMP,"|",Y_HIGH_TEMP
+  print "\033[30;0H\033[0K",Y_PROF_ID,"|",Y_LAB,"|",Y_NUM,"|",Y_NAME,"|",Y_STYLE,"|",round(Y_LOW_TEMP,1),"|",round(Y_HIGH_TEMP,1)
   print "\033[31;0H\033[0K",Y_DESC
 
   return

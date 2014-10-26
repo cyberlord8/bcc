@@ -1,8 +1,17 @@
 Version History
 ~~~~~~~~~~~~~~~
 
+#0.05.3a
+- Fixed crash bug in F/C switching function due to a missing global variable declaration
+- Fixed display error in YEAST PROFILE due to F/C conversion displaying too many digits
+
+#0.05.2a
+- Added a user manual
+
+
 #0.05.1a
 - Fixed bug in bcc.desktop that made the terminal window too small to display bcc properly
+
 
 #0.05.0a
 
