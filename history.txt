@@ -1,6 +1,9 @@
 Version History
 ~~~~~~~~~~~~~~~
 
+#0.05.1a
+- Fixed bug in bcc.desktop that made the terminal window too small to display bcc properly
+
 #0.05.0a
 
 - Yeast profiles added - can now read in yeast database and select a yeast by it's ID number
