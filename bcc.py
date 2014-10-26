@@ -28,14 +28,13 @@ import time
 import math
 import sys
 import select
-
-#read in the settings file
-from bccconfig import *
+import csv
+import os
 
 ######### GLOBAL VARIABLE START HERE ##############################
 #set version number
 #major release . minor release . bugfix
-VERSION = "v0.04.0a"
+VERSION = "v0.05.0a"
 
 #set Celsius to kelvin constant
 c2kelvin = 273.15
@@ -47,6 +46,16 @@ VDD_ADC = 1.8 #voltage divider input voltage
 AIN_MIN = .7 #minimum voltage used during self test - will adjust as needed
 AIN_MAX = 1.3 #maximum voltage used during self test - will adjust as needed
 
+#yeast profile global variables
+Y_PROF_ID = 0 #yeast profile ID
+Y_LAB = "none" #yeast LAB
+Y_NUM = "none" #yeast LAB Number
+Y_NAME = "none" #yeast name
+Y_STYLE = "none" #Beer style
+Y_LOW_TEMP = 0 #recommended yeast low temp
+Y_HIGH_TEMP = 0 #recommended yeast high temp
+Y_DESC = "none"
+
 #other global variables
 HEATER_ON = False #initialize HEATER_ON to False
 COOLER_ON = False #initialize COOLER_ON to false
@@ -57,46 +66,29 @@ COOLER_TIME = 5 * 60 #5 minutes * 60 seconds
 current_temperature = 0
 
 #alarm variables:
+ALARM_SYS_ON = False
 IS_ALARM = False
 ALARM_HIGH_TEMP = False
 ALARM_LOW_TEMP = False
 ALARM_COOLER_MALFUNC = False
 ALARM_HEATER_MALFUNC = False
+TIME_LAST_SMS = 0 #used to track sms message interval
+SMS_INTERVAL = 60 * 60 #60minutes * 60 seconds
+SMS_ALARM_ON = False
 
 TIME_BEFORE_ALARM_TRIGGER = 5 * 60 #(5 minutes in seconds)
 
 #used to wait for one minute to allow moving average temperature to stabilize
 PROGRAM_START_TIME = time.time() 
 
-#brew cycle variable
-#Off, Normal Brew, Warm Brew, Lager, Cold Crash, Clearing
-#BREW_CYCLE = "Off  "
+#read in the settings file
+from bccconfig import *#BREW_CYCLE = "Off  "
 
 if TEMP_SCALE == "Celsius": #from import bccconfig above
   USE_CELSIUS = True
-  #LAGER_TEMP = 7
-  #WARM_TEMP = 21
-  #NORM_TEMP = 18
-  #CRASH_TEMP = 2
-  #CLEAR_TEMP = 10
-  #DESIRED_TEMP = 18 #set initial desired temp
-  #DWELL = 1.2 #set initial dwell temp range
-  #alarm threshold variables:
-#  MAX_HIGH_TEMP = 24
-#  MIN_LOW_TEMP = 1
 
 elif TEMP_SCALE == "Fahrenheit":
   USE_CELSIUS = False
-  #LAGER_TEMP = 45
-  #WARM_TEMP = 70
-  #NORM_TEMP = 65
-  #CRASH_TEMP = 35
-  #CLEAR_TEMP = 50
-  #DESIRED_TEMP = 65 #set initial desired temp
-  #DWELL = 2.5 #set initial dwell temp range
-  #alarm threshold variables:
-#  MAX_HIGH_TEMP = 75
-#  MIN_LOW_TEMP = 34
 
 #thermistor constants used in polynomial equation
 T_a = 7.602330993E-4
@@ -154,10 +146,97 @@ def check_input():
     if key_input[0] == 'x' or key_input[0] == 'X':
       exit_program()
 
+    if key_input[0] == 'y' or key_input[0] == 'Y':
+      yeast_profile()
+
+    draw_screen()
     print_output()
     check_alarms()
     heater_control(O_trending.moving_avg_temp)
     cooler_control(O_trending.moving_avg_temp)
+
+  return
+
+#yeast_profile#########################################################################
+#open the yeast strains csv file and store it in a tuple
+def yeast_profile():
+  global Y_PROF_ID,Y_LAB,Y_NUM,Y_NAME,Y_STYLE,Y_DESC,Y_LOW_TEMP,Y_HIGH_TEMP #yeast
+  global LAGER_TEMP,WARM_TEMP,NORM_TEMP,CRASH_TEMP,CLEAR_TEMP,DESIRED_TEMP,DWELL,MAX_HIGH_TEMP,MIN_LOW_TEMP #temps
+
+  Y_ID = 0
+
+  print "\033[16;0HReading yeast strains file..."
+
+  #read in the yeast csv file and store it in a tuple (array of arrays)
+  try:
+    with open('Yeast Strains.csv') as f:
+      ytuple=[tuple(line) for line in csv.reader(f)]
+  except:
+    print "\033[17;0HError reading file"
+    return
+
+  while True:
+    print "\033[16;0H"
+    try:
+      Y_ID = input("Enter desired yeast profile ID: ")
+      break
+    except:
+      print "Enter a numeric value"
+
+  #check to see if ID number is within range
+  if Y_ID < 1: return
+  if Y_ID > len(ytuple) - 1: return
+
+  #switch to Fahrenheit to store the variables
+  if USE_CELSIUS:
+    switch_scale()
+
+    #store the tuple info in the global yeast variables
+    Y_PROF_ID = int(Y_ID)
+    Y_LAB = ytuple[Y_PROF_ID][1]
+    Y_NUM = ytuple[Y_PROF_ID][2]
+    Y_NAME = ytuple[Y_PROF_ID][3]
+    Y_STYLE = ytuple[Y_PROF_ID][4]
+    Y_DESC = ytuple[Y_PROF_ID][5]
+    Y_LOW_TEMP = int(ytuple[Y_PROF_ID][6])
+    Y_HIGH_TEMP = int(ytuple[Y_PROF_ID][7])
+
+    #set the program variables based on the yeast profile selected
+    #norm temp is 1/4 of the difference warmer than the low yeast temp
+    #warm temp is 1/4 of the difference cooler that the high yeast temp
+    NORM_TEMP = Y_LOW_TEMP + ((Y_HIGH_TEMP - Y_LOW_TEMP)/2.0) - ((Y_HIGH_TEMP - Y_LOW_TEMP)/4.0)
+    WARM_TEMP = Y_LOW_TEMP + ((Y_HIGH_TEMP - Y_LOW_TEMP)/2.0) + ((Y_HIGH_TEMP - Y_LOW_TEMP)/4.0)
+  
+    #now switch back
+    switch_scale()
+
+  else:
+    #store the tuple info in the global yeast variables
+    Y_PROF_ID = int(Y_ID)
+    Y_LAB = ytuple[Y_PROF_ID][1]
+    Y_NUM = ytuple[Y_PROF_ID][2]
+    Y_NAME = ytuple[Y_PROF_ID][3]
+    Y_STYLE = ytuple[Y_PROF_ID][4]
+    Y_DESC = ytuple[Y_PROF_ID][5]
+    Y_LOW_TEMP = int(ytuple[Y_PROF_ID][6])
+    Y_HIGH_TEMP = int(ytuple[Y_PROF_ID][7])
+
+    #set the program variables based on the yeast profile selected
+    #norm temp is 1/4 of the difference warmer than the low yeast temp
+    #warm temp is 1/4 of the difference cooler that the high yeast temp
+    NORM_TEMP = Y_LOW_TEMP + ((Y_HIGH_TEMP - Y_LOW_TEMP)/2.0) - ((Y_HIGH_TEMP - Y_LOW_TEMP)/4.0)
+    WARM_TEMP = Y_LOW_TEMP + ((Y_HIGH_TEMP - Y_LOW_TEMP)/2.0) + ((Y_HIGH_TEMP - Y_LOW_TEMP)/4.0)
+
+
+  if BREW_CYCLE == 'Norm ': DESIRED_TEMP = NORM_TEMP
+  elif BREW_CYCLE == 'Warm ' : DESIRED_TEMP = WARM_TEMP
+
+  MAX_HIGH_TEMP = WARM_TEMP + (DWELL/2.0)
+  MIN_LOW_TEMP = NORM_TEMP - (DWELL/2.0)
+
+  print "\033[16;0H\033[0K"
+  print "\033[17;0H\033[0K"
+  print "\033[18;0H\033[0K"
 
   return
 
@@ -198,6 +277,9 @@ def switch_scale():
     DESIRED_TEMP = (DESIRED_TEMP -32) * 5.0 / 9.0
     MAX_HIGH_TEMP = (MAX_HIGH_TEMP -32) * 5.0 / 9.0
     MIN_LOW_TEMP = (MIN_LOW_TEMP -32) * 5.0 / 9.0
+    Y_LOW_TEMP = (Y_LOW_TEMP - 32) * 5.0 / 9.0
+    Y_HIGH_TEMP = (Y_HIGH_TEMP - 32) * 5.0 / 9.0
+
   else:
     LAGER_TEMP = (LAGER_TEMP * 9.0/5.0) + 32
     WARM_TEMP = (WARM_TEMP * 9.0/5.0) + 32
@@ -207,6 +289,8 @@ def switch_scale():
     DESIRED_TEMP = (DESIRED_TEMP * 9.0/5.0) + 32
     MAX_HIGH_TEMP = (MAX_HIGH_TEMP * 9.0/5.0) + 32
     MIN_LOW_TEMP = (MIN_LOW_TEMP * 9.0/5.0) + 32
+    Y_LOW_TEMP = (Y_LOW_TEMP * 9.0 / 5.0) + 32
+    Y_HIGH_TEMP = (Y_HIGH_TEMP * 9.0 / 5.0) + 32
 
   print "\033[25;20H|  H",round(MAX_HIGH_TEMP,0),"| L",round(MIN_LOW_TEMP,0) 
 
@@ -260,13 +344,13 @@ def normal_brew():
   BREW_CYCLE = "Norm "
 
   if USE_CELSIUS:
-    DESIRED_TEMP = NORM_TEMP #18
-    MAX_HIGH_TEMP = NORM_TEMP + 2
-    MIN_LOW_TEMP = NORM_TEMP - 2
+    DESIRED_TEMP = NORM_TEMP
+    MAX_HIGH_TEMP = WARM_TEMP + (DWELL/2.0)
+    MIN_LOW_TEMP = NORM_TEMP - (DWELL/2.0)
   else:
-    DESIRED_TEMP = NORM_TEMP #65
-    MAX_HIGH_TEMP = NORM_TEMP + 5
-    MIN_LOW_TEMP = NORM_TEMP - 5
+    DESIRED_TEMP = NORM_TEMP
+    MAX_HIGH_TEMP = WARM_TEMP + (DWELL/2.0)
+    MIN_LOW_TEMP = NORM_TEMP - (DWELL/2.0)
 
   return
 
@@ -294,13 +378,13 @@ def warm_brew():
   BREW_CYCLE = "Warm "
 
   if USE_CELSIUS:
-    DESIRED_TEMP = WARM_TEMP #21
-    MAX_HIGH_TEMP = WARM_TEMP + 2
-    MIN_LOW_TEMP = WARM_TEMP - 2
+    DESIRED_TEMP = WARM_TEMP
+    MAX_HIGH_TEMP = WARM_TEMP + (DWELL/2.0)
+    MIN_LOW_TEMP = NORM_TEMP - (DWELL/2.0)
   else:
-    DESIRED_TEMP = WARM_TEMP #70
-    MAX_HIGH_TEMP = WARM_TEMP + 5
-    MIN_LOW_TEMP = WARM_TEMP - 5
+    DESIRED_TEMP = WARM_TEMP
+    MAX_HIGH_TEMP = WARM_TEMP + (DWELL/2.0)
+    MIN_LOW_TEMP = NORM_TEMP - (DWELL/2.0)
 
   return
 
@@ -323,11 +407,35 @@ def lager():
 
 #set alarm thresholds##############################################
 def set_alarm_thresholds():
-  global MAX_HIGH_TEMP,MIN_LOW_TEMP
-
+  global MAX_HIGH_TEMP,MIN_LOW_TEMP,ALARM_SYS_ON,SMS_ALARM_ON
 
   while True:
-    print "\033[16;0H"
+    print "\033[17;0H\033[0K\033[16;0H"
+    try:
+      user_input = raw_input("Alarm on (yes/no): ")
+      if (user_input == "yes"):
+        ALARM_SYS_ON = True
+      else: 
+        ALARM_SYS_ON = False
+        return
+      break
+    except:
+      print "Enter yes or no"
+
+  while True:
+    print "\033[17;0H\033[0K\033[16;0H"
+    try:
+      user_input = raw_input("SMS text messages on (yes/no): ")
+      if (user_input == "yes"):
+        SMS_ALARM_ON = True
+      else: 
+        SMS_ALARM_ON = False
+      break
+    except:
+      print "Enter yes or no"
+
+  while True:
+    print "\033[17;0H\033[0K\033[16;0H"
     try:
       MAX_HIGH_TEMP = input("Enter max temp for alarm: ")
       break
@@ -336,7 +444,7 @@ def set_alarm_thresholds():
 
 
   while True:
-    print "\033[16;0H\033[0K"
+    print "\033[17;0H\033[0K\033[16;0H"
     try:
       MIN_LOW_TEMP = input("Enter min temp for alarm: ")
       break
@@ -347,9 +455,117 @@ def set_alarm_thresholds():
   print "\033[18;0H\033[0K"
   return
 
-#set dwell#########################################################
+#check alarms###########################################################
+def check_alarms():
+  global IS_ALARM,ALARM_HIGH_TEMP,ALARM_LOW_TEMP,ALARM_COOLER_MALFUNC,ALARM_HEATER_MALFUNC, MAX_HIGH_TEMP,MIN_LOW_TEMP,TIME_BEFORE_ALARM_TRIGGER,BREW_CYCLE,ALARM_SYS_ON
+
+#exit function if program has just started
+  if time.time() - PROGRAM_START_TIME < 60:
+    print "\033[24;26H\033[93mOFF\033[39m"
+    print "\033[24;36H\033[93mOFF\033[39m"
+
+    return
+
+  if not ALARM_SYS_ON:
+    print "\033[24;26HOFF\033[39m"
+    print "\033[24;36HOFF\033[39m"
+    return
+
+  if BREW_CYCLE == "Off  ":
+    IS_ALARM = False
+    ALARM_LOW_TEMP = False
+    ALARM_HIGH_TEMP = False
+    print "\033[24;26HOFF"
+    print "\033[24;36HOFF"
+    return
+
+  if ALARM_SYS_ON:
+    print "\033[24;26H\033[32mON \033[39m"
+
+  if SMS_ALARM_ON:
+    print "\033[24;36H\033[32mON \033[39m"
+  else:
+    print "\033[24;36HOFF\033[39m"
+
+    display_alarm()
+
+#    return
+
+  if ALARM_SYS_ON:
+    print "\033[24;26H\033[32mON \033[39m"
+
+  if SMS_ALARM_ON:
+    print "\033[24;36H\033[32mON \033[39m"
+  else:
+    print "\033[24;36HOFF\033[39m"
+#check for over or under temperature condition
+  if O_trending.moving_avg_temp > MAX_HIGH_TEMP:
+    ALARM_HIGH_TEMP = True
+  else:
+    ALARM_HIGH_TEMP = False
+
+  if O_trending.moving_avg_temp < MIN_LOW_TEMP:
+    ALARM_LOW_TEMP = True
+  else:
+    ALARM_LOW_TEMP = False
+
+  if ALARM_LOW_TEMP or ALARM_HIGH_TEMP:
+    IS_ALARM = True
+  else:
+    ALARM_LOW_TEMP = False
+    ALARM_HIGH_TEMP = False
+    IS_ALARM =False
+
+#alarm function should check if cooler or heater is running and if temp is adjusting over time accordingly
+
+  display_alarm()
+
+  print "\033[25;20H|  H",round(MAX_HIGH_TEMP,0),"| L",round(MIN_LOW_TEMP,0) 
+
+  if IS_ALARM:
+    sms_alarm()
+
+  return
+
+#sms_alarm################################################################
+def sms_alarm():
+  global TIME_LAST_SMS,SMS_INTERVAL
+
+  if SMS_ALARM_ON:
+    if (time.time() - TIME_LAST_SMS > SMS_INTERVAL):#check to make sure it's been over an hour
+      if ALARM_HIGH_TEMP:
+        os.system('curl http://textbelt.com/text -d number=XXXXXXXXXX -d "message=bcc alarm - High Temp"')
+        TIME_LAST_SMS = time.time()#update time last sent SMS
+      elif ALARM_LOW_TEMP:
+        os.system('curl http://textbelt.com/text -d number=XXXXXXXXXX -d "message=bcc alarm - Low Temp"')
+        TIME_LAST_SMS = time.time()#update time last sent SMS
+
+      draw_screen()
+      print_output()
+      display_alarm()
+
+  return
+
+#display alarms on screen#################################################
+def display_alarm():
+  global ALARM_HIGH_TEMP,ALARM_LOW_TEMP
+
+  if ALARM_HIGH_TEMP:
+    print "\033[26;35H\033[31mON \033[39m"
+  else:
+    print "\033[26;35HOFF"
+
+  if ALARM_LOW_TEMP:
+    print "\033[27;35H\033[31mON \033[39m"
+  else:
+    print "\033[27;35HOFF"
+  
+  return
+
+
+#set dwell#################################@##############################
 def set_dwell():
-  global DWELL
+  global DWELL,MAX_HIGH_TEMP,MIN_LOW_TEMP,WARM_TEMP,NORM_TEMP
 
   while True:
     print "\033[16;0H"
@@ -363,9 +579,12 @@ def set_dwell():
   print "\033[17;0H\033[0K"
   print "\033[18;0H\033[0K"
 
+  MAX_HIGH_TEMP = WARM_TEMP + (DWELL/2.0)
+  MIN_LOW_TEMP = NORM_TEMP - (DWELL/2.0)
+
   return
 
-#set desired temperature##########################################
+#set desired temperature#################################################
 def set_desired_temp():
   global DESIRED_TEMP
 
@@ -383,7 +602,7 @@ def set_desired_temp():
 
   return
 
-#exit program######################################################
+#exit program############################################################
 def exit_program():
   print "\033[15;0H"
 
@@ -401,11 +620,11 @@ def delay_loop():
   #delay for 15 seconds/check user input every second/display running indicator
     
   for x in xrange(15):
-    if x % 5 == 0: print "\033[15;20H[    =    ]"
-    if x % 5 == 1: print "\033[15;20H[   =-=   ]"
-    if x % 5 == 2: print "\033[15;20H[  =-=-=  ]"
-    if x % 5 == 3: print "\033[15;20H[ =-=-=-= ]"
-    if x % 5 == 4: print "\033[15;20H[=-=-=-=-=]"
+    if x % 5 == 0: print "\033[15;21H[    =    ]"
+    if x % 5 == 1: print "\033[15;21H[   =-=   ]"
+    if x % 5 == 2: print "\033[15;21H[  =-=-=  ]"
+    if x % 5 == 3: print "\033[15;21H[ =-=-=-= ]"
+    if x % 5 == 4: print "\033[15;21H[=-=-=-=-=]"
 
     print "\033[16;0H\033[0K\033[15;0H"
 
@@ -471,7 +690,7 @@ def calculate_temperature():
     res_therm = R_BIAS * (VDD_ADC - Vout) / Vout
 
     #calculate temperature in kelvin
-    temp_kelvin = 1/(T_a + T_b * math.log(res_therm) + T_c * pow(math.log(res_therm),3))
+    temp_kelvin = 1.0/(T_a + T_b * math.log(res_therm) + T_c * pow(math.log(res_therm),3.0))
     temp_celsius = temp_kelvin - c2kelvin
     temp_fahren = (temp_celsius * 9.0/5.0) + 32
 
@@ -588,7 +807,7 @@ class Trend:
 
   def set_average(self):###################
 
-    self.moving_avg_temp = (self.temp1 + self.temp2 + self.temp3 + self.temp4) / 4
+    self.moving_avg_temp = (self.temp1 + self.temp2 + self.temp3 + self.temp4) / 4.0
 
     return
 
@@ -616,68 +835,6 @@ def reset_min_max():
 
   return
 
-#check alarms###########################################################
-def check_alarms():
-  global IS_ALARM,ALARM_HIGH_TEMP,ALARM_LOW_TEMP,ALARM_COOLER_MALFUNC,ALARM_HEATER_MALFUNC, MAX_HIGH_TEMP,MIN_LOW_TEMP,TIME_BEFORE_ALARM_TRIGGER,BREW_CYCLE
-
-#exit function if program has just started
-  if time.time() - PROGRAM_START_TIME < 60:
-    print "\033[24;35H\033[93mOFF\033[39m"
-    return
-
-  if BREW_CYCLE == "Off  ":
-    IS_ALARM = False
-    ALARM_LOW_TEMP = False
-    ALARM_HIGH_TEMP = False
-    print "\033[24;35HOFF"
-
-    display_alarm()
-
-    return
-
-  print "\033[24;35H\033[32mON \033[39m"
-#check for over or under temperature condition
-  if O_trending.moving_avg_temp > MAX_HIGH_TEMP:
-    ALARM_HIGH_TEMP = True
-  else:
-    ALARM_HIGH_TEMP = False
-
-  if O_trending.moving_avg_temp < MIN_LOW_TEMP:
-    ALARM_LOW_TEMP = True
-  else:
-    ALARM_LOW_TEMP = False
-
-  if ALARM_LOW_TEMP or ALARM_HIGH_TEMP:
-    IS_ALARM = True
-  else:
-    ALARM_LOW_TEMP = False
-    ALARM_HIGH_TEMP = False
-    IS_ALARM =False
-
-#alarm function should check if cooler or heater is running and if temp is adjusting over time accordingly
-
-  display_alarm()
-
-  print "\033[25;20H|  H",round(MAX_HIGH_TEMP,0),"| L",round(MIN_LOW_TEMP,0) 
-
-  return
-
-#display alarms on screen#################################################
-def display_alarm():
-  global ALARM_HIGH_TEMP,ALARM_LOW_TEMP
-
-  if ALARM_HIGH_TEMP:
-    print "\033[26;35H\033[31mON \033[39m"
-  else:
-    print "\033[26;35HOFF"
-
-  if ALARM_LOW_TEMP:
-    print "\033[27;35H\033[31mON \033[39m"
-  else:
-    print "\033[27;35HOFF"
-  
-  return
-
 #draw screen##############################################################
 def draw_screen():
 
@@ -689,16 +846,16 @@ def draw_screen():
 
 
   print "\033[5;0H"
-  print "\033[6;0H----------------------=MENU=---------------------"
-  print "\033[7;0H| S - Scale(C/F)| A - Alarms    | C - Clear     |"     
-  print "\033[8;0H| T - Set Temp  | F - Refresh   | L - Lager     |"
-  print "\033[9;0H| D - Set Dwell |               | N - Normal    |"
-  print "\033[10;0H|               |               | O - Off       |"
-  print "\033[11;0H|               |               | R - Crash     |"
-  print "\033[12;0H|               |               | W - Warm      |"
-  print "\033[13;0H|               |               |               |"
-  print "\033[14;0H|               |               | X - Exit      |"
-  print "\033[15;0H===================[         ]==================="
+  print "\033[6;0H-----------------------=MENU=---------------------"
+  print "\033[7;0H| S - Scale(C/F) | A - Alarms    | C - Clear     |"     
+  print "\033[8;0H| T - Set Temp   | F - Refresh   | L - Lager     |"
+  print "\033[9;0H| D - Set Dwell  |               | N - Normal    |"
+  print "\033[10;0H| Y - Yeast Prof |               | O - Off       |"
+  print "\033[11;0H|                |               | R - Crash     |"
+  print "\033[12;0H|                |               | W - Warm      |"
+  print "\033[13;0H|                |               |               |"
+  print "\033[14;0H|                |               | X - Exit      |"
+  print "\033[15;0H====================[         ]==================="
 
   print "\033[23;0H\033[0K--=Brew Status=--"
   print "\033[24;0H\033[0K Brew Cycle:     "
@@ -708,7 +865,7 @@ def draw_screen():
   print "\033[28;0H\033[0K                 "
 
   print "\033[23;20H\033[0K| --=Alarm Status=--"
-  print "\033[24;20H\033[0K|  System:"
+  print "\033[24;20H\033[0K| Sys     | SMS "
   print "\033[25;20H\033[0K|  H",round(MAX_HIGH_TEMP,0),"| L",round(MIN_LOW_TEMP,0) 
   print "\033[26;20H\033[0K|  High Temp:  OFF"
   print "\033[27;20H\033[0K|  Low Temp:   OFF"
@@ -732,6 +889,11 @@ def draw_screen():
   print "\033[26;77H\033[0K |            "
   print "\033[27;77H\033[0K |            "
   print "\033[28;77H\033[0K |            "
+
+  print "\033[29;0H\033[0K YEAST PROFILE"
+  print "\033[30;0H\033[0K",Y_PROF_ID,"|",Y_LAB,"|",Y_NUM,"|",Y_NAME,"|",Y_STYLE,"|",Y_LOW_TEMP,"|",Y_HIGH_TEMP
+  print "\033[31;0H\033[0K",Y_DESC
+
 
   #print "\n\n"
   #exit(0)
@@ -758,6 +920,10 @@ def print_output():
   print "\033[28;71H",round(O_trending.moving_avg_temp,1)
 
   print "\033[24;88H\033[0K",round(DWELL,1)
+
+  print "\033[30;0H\033[0K",Y_PROF_ID,"|",Y_LAB,"|",Y_NUM,"|",Y_NAME,"|",Y_STYLE,"|",Y_LOW_TEMP,"|",Y_HIGH_TEMP
+  print "\033[31;0H\033[0K",Y_DESC
+
   return
 
 def write_settings():
@@ -777,6 +943,16 @@ def write_settings():
   settings_file.write("MIN_TEMP = " + str(MIN_TEMP) + "\n")
   settings_file.write("MAX_TEMP = " + str(MAX_TEMP) + "\n")
   settings_file.write("BREW_CYCLE = '" + str(BREW_CYCLE) + "'\n")
+  settings_file.write("Y_PROF_ID = " + str(Y_PROF_ID) + "\n")
+  settings_file.write("Y_LAB = '" + str(Y_LAB) + "'\n")
+  settings_file.write("Y_NUM = '" + str(Y_NUM) + "'\n")
+  settings_file.write("Y_NAME = '" + str(Y_NAME) + "'\n")
+  settings_file.write("Y_STYLE = '" + str(Y_STYLE) + "'\n")
+  settings_file.write("Y_DESC = '" + str(Y_DESC) + "'\n")
+  settings_file.write("Y_LOW_TEMP = " + str(Y_LOW_TEMP) + "\n")
+  settings_file.write("Y_HIGH_TEMP = " + str(Y_HIGH_TEMP) + "\n")
+  settings_file.write("SMS_ALARM_ON = " + str(SMS_ALARM_ON) + "\n")
+  settings_file.write("ALARM_SYS_ON = " + str(ALARM_SYS_ON) + "\n")
 
   settings_file.close()
 

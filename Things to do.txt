@@ -3,12 +3,15 @@ A list of things to do for the bcc project. The number in parenthesis is the pri
 * (1)Bug Fixes
 	- X Fix Celsius to Fahrenheit formula
 
+* (2)Work on trend
+	- _  Work on better algorythm for trend analysis
+
 * (1)Alarms:
 	- X Over temp
 	- X Under temp	
 	- _ Cooler on but not cooling
 	- _ Heater on but not heating
-	- _ Send alarm texts or emails
+	- X Send alarm texts or emails
 
 
 * (1)Save settings to file
@@ -25,6 +28,8 @@ A list of things to do for the bcc project. The number in parenthesis is the pri
 	- X  MIN_TEMP
 	- X  MAX_TEMP
 	- X  BREW_CYCLE
+	- X  ALARM_SYS_ON
+	- X  SMS_ALARM_ON
 	- _  BREW_NAME
 	- _  BREW_STYLE
 
@@ -32,7 +37,7 @@ A list of things to do for the bcc project. The number in parenthesis is the pri
 * (2)Database
 	- _ Save readings
 	- _ Document when settings changed
-	- _ Yeast strains and recommended temperatures
+	- X Yeast strains and recommended temperatures
 	- _ Beer styles 
 
 

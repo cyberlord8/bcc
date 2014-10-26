@@ -1,6 +1,12 @@
 Version History
 ~~~~~~~~~~~~~~~
 
+#0.05.0a
+
+- Yeast profiles added - can now read in yeast database and select a yeast by it's ID number
+- Modified the alarm system and added SMS texting of alarm status every hour (enter YOUR OWN phone number!!!)
+
+
 #0.04.0a
 
 - Fixed bug where the different brew cycles were not calculating properly due to global variable not being declared
