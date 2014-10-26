@@ -1,9 +1,14 @@
 Version History
 ~~~~~~~~~~~~~~~
 
+#0.05.4a
+- Added Dwell to C/F scale switching function
+
+
 #0.05.3a
 - Fixed crash bug in F/C switching function due to a missing global variable declaration
 - Fixed display error in YEAST PROFILE due to F/C conversion displaying too many digits
+
 
 #0.05.2a
 - Added a user manual

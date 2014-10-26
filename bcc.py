@@ -34,7 +34,7 @@ import os
 ######### GLOBAL VARIABLE START HERE ##############################
 #set version number
 #major release . minor release . bugfix
-VERSION = "v0.05.3a"
+VERSION = "v0.05.4a"
 
 #set Celsius to kelvin constant
 c2kelvin = 273.15
@@ -279,6 +279,7 @@ def switch_scale():
     MIN_LOW_TEMP = (MIN_LOW_TEMP -32) * 5.0 / 9.0
     Y_LOW_TEMP = (Y_LOW_TEMP - 32) * 5.0 / 9.0
     Y_HIGH_TEMP = (Y_HIGH_TEMP - 32) * 5.0 / 9.0
+    DWELL = (DWELL)*5.0/9.0
 
   else:
     LAGER_TEMP = (LAGER_TEMP * 9.0/5.0) + 32
@@ -291,6 +292,7 @@ def switch_scale():
     MIN_LOW_TEMP = (MIN_LOW_TEMP * 9.0/5.0) + 32
     Y_LOW_TEMP = (Y_LOW_TEMP * 9.0 / 5.0) + 32
     Y_HIGH_TEMP = (Y_HIGH_TEMP * 9.0 / 5.0) + 32
+    DWELL = (DWELL)*9.0/5.0
 
   print "\033[25;20H|  H",round(MAX_HIGH_TEMP,0),"| L",round(MIN_LOW_TEMP,0) 
 
