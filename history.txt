@@ -1,31 +1,38 @@
 Version History
 ~~~~~~~~~~~~~~~
 
-#0.05.4a
+#0.06.0a (31 Oct 2014)
+- Fixed minor display bug with alarm status display when SMS texts were sent
+- Fixed bug where sometimes the high temp alarm was on but the cooler was not
+- Added cell phone number to settings file instead of hard coded in software
+- Settings file is now written to every time a command is entered in case the program crashes
+- Added database (database.csv) that stores current system status every 15 minutes
+- Added brew information - preparation for auto brew process
+
+
+#0.05.4a (25 Oct 2014)
 - Added Dwell to C/F scale switching function
 
 
-#0.05.3a
+#0.05.3a (25 Oct 2014)
 - Fixed crash bug in F/C switching function due to a missing global variable declaration
 - Fixed display error in YEAST PROFILE due to F/C conversion displaying too many digits
 
 
-#0.05.2a
+#0.05.2a (25 Oct 2014)
 - Added a user manual
 
 
-#0.05.1a
+#0.05.1a (25 Oct 2014)
 - Fixed bug in bcc.desktop that made the terminal window too small to display bcc properly
 
 
-#0.05.0a
-
-- Yeast profiles added - can now read in yeast database and select a yeast by it's ID number
+#0.05.0a (25 Oct 2014)
+- Yeast profiles (Yeast Strains.csv) added - can now read in yeast database and select a yeast by it's ID number
 - Modified the alarm system and added SMS texting of alarm status every hour (enter YOUR OWN phone number!!!)
 
 
-#0.04.0a
-
+#0.04.0a (23 Oct 2014)
 - Fixed bug where the different brew cycles were not calculating properly due to global variable not being declared
 - bcc now saves current settings to a file (bccconfig.py)
 - Increased precision in F/C conversion formulas which was causing a rounding error
@@ -34,15 +41,11 @@ Version History
 - Fixed bug where cycling brew cycle off and on would cause compressor to turn on and off with no 5 minute delay
 
 
-
 #0.03.01a (05 Oct 2014)
-
 - Fixed slight bug with alarm system indicating an alarm when brew cycle is off.
 
 
-
 #0.03a (04 Oct 2014)
-
 - Added beginnings of an alarm system
 - Added exception handling to user input
 - Added ability to switch between C/F scales
@@ -50,22 +53,16 @@ Version History
 - Added beginnings of the automated brewing system
 
 
-
 #0.02a (01 Oct 2014)
-
 - Added a menu so desired temperature and dwell can be set on the fly
 - Updated the trending so it averages the last 4 readings (1 minutes worth)
 
 
-
 #0.01a (23 Sep 2014)
-
 - Added a title
 - Used ASCII escape sequences to position the text on the screen... eliminated scrolling text
 
 
-
 #Original contribution (14 Jul 2014)
-
 - Basic program functionality
 - Reads temperature and turns LEDs on/off as desired

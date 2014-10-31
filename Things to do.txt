@@ -3,14 +3,16 @@ A list of things to do for the bcc project. The number in parenthesis is the pri
 * (1)Bug Fixes
 	- X Fix Celsius to Fahrenheit formula
 
+* (1)Break bcc.py into multiple files or at least move functions so they are organized by relationship
+
 * (2)Work on trend
-	- _  Work on better algorythm for trend analysis
+	- _  Work on better algorithm for trend analysis
 
 * (1)Alarms:
 	- X Over temp
 	- X Under temp	
-	- _ Cooler on but not cooling
-	- _ Heater on but not heating
+	- _ Cooler on but not cooling (malfunction)
+	- _ Heater on but not heating (malfunction)
 	- X Send alarm texts or emails
 
 
@@ -51,11 +53,11 @@ A list of things to do for the bcc project. The number in parenthesis is the pri
 
 
 * (3)Automate Brew Process
+	- _ Time based brew process based on style/yeast strain
 	- _ CO2 Sensor/Gas Pressure Sensor
 
+* (3)Chart the Brew Process
+	- _ gnuplot?
+	
 
-* (5)Web Interface Control
 
-
-* (8)GUI Interface Control
-	- _ LCD Panel

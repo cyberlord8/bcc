@@ -34,7 +34,7 @@ import os
 ######### GLOBAL VARIABLE START HERE ##############################
 #set version number
 #major release . minor release . bugfix
-VERSION = "v0.05.4a"
+VERSION = "v0.06.0a"
 
 #set Celsius to kelvin constant
 c2kelvin = 273.15
@@ -43,8 +43,8 @@ c2kelvin = 273.15
 #global variables used when reading AIN0
 R_BIAS = 52000 #resistor value used in the thermistor voltage divider
 VDD_ADC = 1.8 #voltage divider input voltage
-AIN_MIN = .7 #minimum voltage used during self test - will adjust as needed
-AIN_MAX = 1.3 #maximum voltage used during self test - will adjust as needed
+AIN_MIN = .3 #minimum voltage used during self test - will adjust as needed
+AIN_MAX = 1.7 #maximum voltage used during self test - will adjust as needed
 
 #yeast profile global variables
 Y_PROF_ID = 0 #yeast profile ID
@@ -56,12 +56,22 @@ Y_LOW_TEMP = 0 #recommended yeast low temp
 Y_HIGH_TEMP = 0 #recommended yeast high temp
 Y_DESC = "none"
 
+#brew info variables
+BREW_NAME = "none"
+BREW_BATCH_NUM = "none"
+BREW_BATCH_SIZE = 0.0
+BREW_STYLE = "none"
+BREW_METHOD = "none"
+
 #other global variables
 HEATER_ON = False #initialize HEATER_ON to False
 COOLER_ON = False #initialize COOLER_ON to false
 
 TIME_LAST_COOLER = 0 #variable to track when cooler was last turned off
 COOLER_TIME = 5 * 60 #5 minutes * 60 seconds
+
+LAST_TIME_DATABASE = 0 #variable to track last database update was made
+DATABASE_INTERVAL = 15 * 60 #15 minutes * 60 seconds
 
 current_temperature = 0
 
@@ -79,16 +89,7 @@ SMS_ALARM_ON = False
 TIME_BEFORE_ALARM_TRIGGER = 5 * 60 #(5 minutes in seconds)
 
 #used to wait for one minute to allow moving average temperature to stabilize
-PROGRAM_START_TIME = time.time() 
-
-#read in the settings file
-from bccconfig import *#BREW_CYCLE = "Off  "
-
-if TEMP_SCALE == "Celsius": #from import bccconfig above
-  USE_CELSIUS = True
-
-elif TEMP_SCALE == "Fahrenheit":
-  USE_CELSIUS = False
+PROGRAM_START_TIME = time.time()
 
 #thermistor constants used in polynomial equation
 T_a = 7.602330993E-4
@@ -101,8 +102,23 @@ GPIO.setup("P9_15", GPIO.OUT) #setup pin P9_48 as output pin HEATER
 GPIO.setup("P9_23", GPIO.OUT) #setup pin P9_49 as output pin COOLER
 
 
+#read in the settings file
+from bccconfig import *
+
+if TEMP_SCALE == "Celsius": #from import bccconfig above
+  USE_CELSIUS = True
+
+elif TEMP_SCALE == "Fahrenheit":
+  USE_CELSIUS = False
+
 
 ######### FUNCTIONS START HERE #####################################
+
+######### AUTOMATION FUNCTIONS #####################################
+
+
+
+######### USER INPUT FUNCTIONS #####################################
 
 #check for user input###############################################
 def check_input():
@@ -112,6 +128,9 @@ def check_input():
 
     if key_input[0] == 'a' or key_input[0] == 'A':
       set_alarm_thresholds()
+
+    if key_input[0] == 'b' or key_input[0] == 'B':
+      get_brew_info()
 
     if key_input[0] == 'c' or key_input[0] == 'C':
       clear_brew()
@@ -151,9 +170,76 @@ def check_input():
 
     draw_screen()
     print_output()
+
     check_alarms()
+
     heater_control(O_trending.moving_avg_temp)
     cooler_control(O_trending.moving_avg_temp)
+
+    write_settings()
+    update_database()
+
+  return
+
+#get_brew_info#########################################################################
+#get information about brew session from user
+def get_brew_info():
+  global BREW_NAME,BREW_BATCH_NUM,BREW_BATCH_SIZE,BREW_STYLE,BREW_METHOD,Y_PROF_ID,BREW_CYCLE
+
+  from datetime import datetime
+
+  while True:
+    print "\033[17;0H\033[0K\033[16;0H"
+    try:
+      BREW_NAME = raw_input("Enter brew name: ")
+      break
+    except:
+      print "Enter brew name"
+
+  while True:
+    print "\033[17;0H\033[0K\033[16;0H"
+    try:
+      BREW_BATCH_NUM = raw_input("Enter brew batch number: ")
+      break
+    except:
+      print "Enter brew batch number"
+
+  while True:
+    print "\033[17;0H\033[0K\033[16;0H"
+    try:
+      BREW_BATCH_SIZE = input("Enter brew batch size: ")
+      break
+    except:
+      print "Enter a number"
+
+  while True:
+    print "\033[17;0H\033[0K\033[16;0H"
+    try:
+      BREW_STYLE = raw_input("Enter brew style: ")
+      break
+    except:
+      print "Enter brew style"
+
+  while True:
+    print "\033[17;0H\033[0K\033[16;0H"
+    try:
+      BREW_METHOD = raw_input("Enter brew method: ")
+      break
+    except:
+      print "Enter brew name"
+
+  yeast_profile()
+
+  database_file = open("database.csv", "a")
+
+  database_file.write(str(BREW_NAME)+", "+str(BREW_BATCH_NUM)+", "+str(BREW_BATCH_SIZE)+", "+str(BREW_STYLE)+", "+
+                      str(BREW_METHOD)+", "+str(Y_PROF_ID)+", "+str(Y_NAME)+"\n")
+
+  database_file.close()
+
+  BREW_CYCLE = "Off  "
+
+  reset_min_max()
 
   return
 
@@ -231,14 +317,15 @@ def yeast_profile():
   if BREW_CYCLE == 'Norm ': DESIRED_TEMP = NORM_TEMP
   elif BREW_CYCLE == 'Warm ' : DESIRED_TEMP = WARM_TEMP
 
-  MAX_HIGH_TEMP = WARM_TEMP + (DWELL/2.0)
-  MIN_LOW_TEMP = NORM_TEMP - (DWELL/2.0)
+  MAX_HIGH_TEMP = WARM_TEMP + DWELL
+  MIN_LOW_TEMP = NORM_TEMP - DWELL
 
   print "\033[16;0H\033[0K"
   print "\033[17;0H\033[0K"
   print "\033[18;0H\033[0K"
 
   return
+
 
 def switch_scale():
   global USE_CELSIUS,LAGER_TEMP,WARM_TEMP,NORM_TEMP,CRASH_TEMP,CLEAR_TEMP,DESIRED_TEMP,DWELL,MAX_HIGH_TEMP
@@ -320,6 +407,8 @@ def brew_off():
     MAX_HIGH_TEMP = 75
     MIN_LOW_TEMP = 34
 
+  display_alarm()
+
   return
 
 #clear cycle#######################################################
@@ -347,12 +436,12 @@ def normal_brew():
 
   if USE_CELSIUS:
     DESIRED_TEMP = NORM_TEMP
-    MAX_HIGH_TEMP = WARM_TEMP + (DWELL/2.0)
-    MIN_LOW_TEMP = NORM_TEMP - (DWELL/2.0)
+    MAX_HIGH_TEMP = WARM_TEMP + DWELL
+    MIN_LOW_TEMP = NORM_TEMP - DWELL
   else:
     DESIRED_TEMP = NORM_TEMP
-    MAX_HIGH_TEMP = WARM_TEMP + (DWELL/2.0)
-    MIN_LOW_TEMP = NORM_TEMP - (DWELL/2.0)
+    MAX_HIGH_TEMP = WARM_TEMP + DWELL
+    MIN_LOW_TEMP = NORM_TEMP - DWELL
 
   return
 
@@ -381,12 +470,12 @@ def warm_brew():
 
   if USE_CELSIUS:
     DESIRED_TEMP = WARM_TEMP
-    MAX_HIGH_TEMP = WARM_TEMP + (DWELL/2.0)
-    MIN_LOW_TEMP = NORM_TEMP - (DWELL/2.0)
+    MAX_HIGH_TEMP = WARM_TEMP + DWELL
+    MIN_LOW_TEMP = NORM_TEMP - DWELL
   else:
     DESIRED_TEMP = WARM_TEMP
-    MAX_HIGH_TEMP = WARM_TEMP + (DWELL/2.0)
-    MIN_LOW_TEMP = NORM_TEMP - (DWELL/2.0)
+    MAX_HIGH_TEMP = WARM_TEMP + DWELL
+    MIN_LOW_TEMP = NORM_TEMP - DWELL
 
   return
 
@@ -457,6 +546,69 @@ def set_alarm_thresholds():
   print "\033[18;0H\033[0K"
   return
 
+#set dwell#################################@##############################
+def set_dwell():
+  global DWELL,MAX_HIGH_TEMP,MIN_LOW_TEMP,WARM_TEMP,NORM_TEMP
+
+  while True:
+    print "\033[16;0H"
+    try:
+      DWELL = input("Enter dwell: ")
+      break
+    except:
+      print "Enter a numerical value"
+      print "\033[16;0H\033[0K"
+
+  print "\033[17;0H\033[0K"
+  print "\033[18;0H\033[0K"
+
+  MAX_HIGH_TEMP = WARM_TEMP + DWELL
+  MIN_LOW_TEMP = NORM_TEMP - DWELL
+
+  return
+
+#set desired temperature#################################################
+def set_desired_temp():
+  global DESIRED_TEMP
+
+
+  while True:
+    print "\033[16;0H"
+    try:
+      DESIRED_TEMP = input("Enter desired temperature: ")
+      break
+    except:
+      print "Enter a numerical value"
+
+  print "\033[17;0H\033[0K"
+  print "\033[18;0H\033[0K"
+
+  return
+
+#exit program############################################################
+def exit_program():
+
+  from datetime import datetime
+
+  print "\033[15;0H"
+
+  #do some shutdown stuff here if desired
+  print "Writing files..."
+  write_settings()
+
+  database_file = open("database.csv", "a")
+
+  database_file.write("bcc.py exiting normally: " + str(datetime.now()) + "\n")
+
+  database_file.close()
+
+  print "Exiting program..."
+  time.sleep(2)
+  exit(0)
+
+
+######### ALARM FUNCTIONS ##############################################
+
 #check alarms###########################################################
 def check_alarms():
   global IS_ALARM,ALARM_HIGH_TEMP,ALARM_LOW_TEMP,ALARM_COOLER_MALFUNC,ALARM_HEATER_MALFUNC, MAX_HIGH_TEMP,MIN_LOW_TEMP,TIME_BEFORE_ALARM_TRIGGER,BREW_CYCLE,ALARM_SYS_ON
@@ -468,38 +620,18 @@ def check_alarms():
 
     return
 
-  if not ALARM_SYS_ON:
+  if not ALARM_SYS_ON:#if alarm system is off
     print "\033[24;26HOFF\033[39m"
     print "\033[24;36HOFF\033[39m"
     return
 
-  if BREW_CYCLE == "Off  ":
+  if BREW_CYCLE == "Off  ": #if brew cycle is off
     IS_ALARM = False
     ALARM_LOW_TEMP = False
     ALARM_HIGH_TEMP = False
-    print "\033[24;26HOFF"
-    print "\033[24;36HOFF"
+    display_alarm()
     return
 
-  if ALARM_SYS_ON:
-    print "\033[24;26H\033[32mON \033[39m"
-
-  if SMS_ALARM_ON:
-    print "\033[24;36H\033[32mON \033[39m"
-  else:
-    print "\033[24;36HOFF\033[39m"
-
-    display_alarm()
-
-#    return
-
-  if ALARM_SYS_ON:
-    print "\033[24;26H\033[32mON \033[39m"
-
-  if SMS_ALARM_ON:
-    print "\033[24;36H\033[32mON \033[39m"
-  else:
-    print "\033[24;36HOFF\033[39m"
 #check for over or under temperature condition
   if O_trending.moving_avg_temp > MAX_HIGH_TEMP:
     ALARM_HIGH_TEMP = True
@@ -536,10 +668,10 @@ def sms_alarm():
   if SMS_ALARM_ON:
     if (time.time() - TIME_LAST_SMS > SMS_INTERVAL):#check to make sure it's been over an hour
       if ALARM_HIGH_TEMP:
-        os.system('curl http://textbelt.com/text -d number=XXXXXXXXXX -d "message=bcc alarm - High Temp"')
+        os.system('curl http://textbelt.com/text -d number='+CELL_NUMBER+' -d "message=bcc alarm - High Temp"')
         TIME_LAST_SMS = time.time()#update time last sent SMS
       elif ALARM_LOW_TEMP:
-        os.system('curl http://textbelt.com/text -d number=XXXXXXXXXX -d "message=bcc alarm - Low Temp"')
+        os.system('curl http://textbelt.com/text -d number='+CELL_NUMBER+' -d "message=bcc alarm - Low Temp"')
         TIME_LAST_SMS = time.time()#update time last sent SMS
 
       draw_screen()
@@ -552,6 +684,16 @@ def sms_alarm():
 def display_alarm():
   global ALARM_HIGH_TEMP,ALARM_LOW_TEMP
 
+  if ALARM_SYS_ON:
+    print "\033[24;26H\033[32mON \033[39m"
+  else:
+    print "\033[24;26HOFF\033[39m" 
+
+  if SMS_ALARM_ON:
+    print "\033[24;36H\033[32mON \033[39m"
+  else:
+    print "\033[24;36HOFF\033[39m"
+
   if ALARM_HIGH_TEMP:
     print "\033[26;35H\033[31mON \033[39m"
   else:
@@ -561,61 +703,17 @@ def display_alarm():
     print "\033[27;35H\033[31mON \033[39m"
   else:
     print "\033[27;35HOFF"
+
+  if BREW_CYCLE == "Off  ":   
+    print "\033[24;26HOFF" 
+    print "\033[24;36HOFF"
+    print "\033[26;35HOFF"
+    print "\033[27;35HOFF"
   
   return
 
 
-#set dwell#################################@##############################
-def set_dwell():
-  global DWELL,MAX_HIGH_TEMP,MIN_LOW_TEMP,WARM_TEMP,NORM_TEMP
-
-  while True:
-    print "\033[16;0H"
-    try:
-      DWELL = input("Enter dwell: ")
-      break
-    except:
-      print "Enter a numerical value"
-      print "\033[16;0H\033[0K"
-
-  print "\033[17;0H\033[0K"
-  print "\033[18;0H\033[0K"
-
-  MAX_HIGH_TEMP = WARM_TEMP + (DWELL/2.0)
-  MIN_LOW_TEMP = NORM_TEMP - (DWELL/2.0)
-
-  return
-
-#set desired temperature#################################################
-def set_desired_temp():
-  global DESIRED_TEMP
-
-
-  while True:
-    print "\033[16;0H"
-    try:
-      DESIRED_TEMP = input("Enter desired temperature: ")
-      break
-    except:
-      print "Enter a numerical value"
-
-  print "\033[17;0H\033[0K"
-  print "\033[18;0H\033[0K"
-
-  return
-
-#exit program############################################################
-def exit_program():
-  print "\033[15;0H"
-
-  #do some shutdown stuff here if desired
-  print "Writing settings to file..."
-  write_settings()
-
-
-  print "Exiting program..."
-  time.sleep(2)
-  exit(0)
+######### PROGRAM OPERATION FUNCTIONS ###########################
 
 #delay_loop function#############################################
 def delay_loop():
@@ -715,7 +813,7 @@ def cooler_control(MAvg_temp):
       GPIO.output("P9_23",GPIO.LOW)
       return
       
-    if MAvg_temp > DESIRED_TEMP + DWELL:
+    if MAvg_temp > DESIRED_TEMP + DWELL/2.0:
       if time.time() - TIME_LAST_COOLER > COOLER_TIME: #has it been more than 5 minutes?
         if not COOLER_ON:
           COOLER_ON = True
@@ -749,7 +847,7 @@ def heater_control(MAvg_temp):
       GPIO.output("P9_15",GPIO.LOW)
       return
 
-    if MAvg_temp < DESIRED_TEMP - DWELL:
+    if MAvg_temp < DESIRED_TEMP - DWELL/2.0:
       if not HEATER_ON:
           HEATER_ON = True
           GPIO.output("P9_15",GPIO.HIGH)
@@ -766,7 +864,6 @@ def heater_control(MAvg_temp):
 
 #Trend Class##############################################
 #calculates whether temp went up or down or stayed the same since last checked
-#may make this an averaging function so we check the current temp compared to last # averages
 
 class Trend:
 
@@ -837,6 +934,9 @@ def reset_min_max():
 
   return
 
+
+######### DISPLAY FUNCTIONS ##############################################
+
 #draw screen##############################################################
 def draw_screen():
 
@@ -845,18 +945,16 @@ def draw_screen():
   print "\033[3;0H~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
   print "\033[4;0HBy: My BBB Projects"
 
-
-
   print "\033[5;0H"
   print "\033[6;0H-----------------------=MENU=---------------------"
   print "\033[7;0H| S - Scale(C/F) | A - Alarms    | C - Clear     |"     
-  print "\033[8;0H| T - Set Temp   | F - Refresh   | L - Lager     |"
-  print "\033[9;0H| D - Set Dwell  |               | N - Normal    |"
+  print "\033[8;0H| T - Set Temp   | B - Brew Info | L - Lager     |"
+  print "\033[9;0H| D - Set Dwell  | F - Refresh   | N - Normal    |"
   print "\033[10;0H| Y - Yeast Prof |               | O - Off       |"
   print "\033[11;0H|                |               | R - Crash     |"
   print "\033[12;0H|                |               | W - Warm      |"
   print "\033[13;0H|                |               |               |"
-  print "\033[14;0H|                |               | X - Exit      |"
+  print "\033[14;0H|                | X - Exit      |               |"
   print "\033[15;0H====================[         ]==================="
 
   print "\033[23;0H\033[0K--=Brew Status=--"
@@ -887,7 +985,7 @@ def draw_screen():
   print "\033[28;61H\033[0K |  MAvg:     "
 
   print "\033[24;77H\033[0K |  Dwell:    "
-  print "\033[25;77H\033[0K |            "
+  print "\033[25;77H\033[0K |  Cell: "+CELL_NUMBER
   print "\033[26;77H\033[0K |            "
   print "\033[27;77H\033[0K |            "
   print "\033[28;77H\033[0K |            "
@@ -895,6 +993,9 @@ def draw_screen():
   print "\033[29;0H\033[0K YEAST PROFILE"
   print "\033[30;0H\033[0K",Y_PROF_ID,"|",Y_LAB,"|",Y_NUM,"|",Y_NAME,"|",Y_STYLE,"|",round(Y_LOW_TEMP,1),"|",round(Y_HIGH_TEMP,1)
   print "\033[31;0H\033[0K",Y_DESC
+
+  print "\033[33;0H\033[0K BREW INFO"
+  print "\033[34;0H\033[0K",BREW_NAME,"|",BREW_BATCH_NUM,"|",BREW_BATCH_SIZE,"|",BREW_STYLE,"|",BREW_METHOD
 
 
   #print "\n\n"
@@ -928,9 +1029,13 @@ def print_output():
 
   return
 
+
+######### DATABASE FUNCTIONS ###################################################
+
+#write settings to file ########################################################
 def write_settings():
 
-  settings_file = open("bccconfig.py", "w")
+  settings_file = open("bccconfig.py", "w") #overwrite existing settings file
 
   settings_file.write("TEMP_SCALE = '" + TEMP_SCALE + "'\n")
   settings_file.write("LAGER_TEMP = " + str(LAGER_TEMP) + "\n")
@@ -955,10 +1060,129 @@ def write_settings():
   settings_file.write("Y_HIGH_TEMP = " + str(Y_HIGH_TEMP) + "\n")
   settings_file.write("SMS_ALARM_ON = " + str(SMS_ALARM_ON) + "\n")
   settings_file.write("ALARM_SYS_ON = " + str(ALARM_SYS_ON) + "\n")
+  settings_file.write("CELL_NUMBER = '" + str(CELL_NUMBER) + "'\n")
+  settings_file.write("BREW_NAME = '" + str(BREW_NAME) + "'\n")
+  settings_file.write("BREW_BATCH_NUM = '" + str(BREW_BATCH_NUM) + "'\n")
+  settings_file.write("BREW_BATCH_SIZE = " + str(BREW_BATCH_SIZE) + "\n")
+  settings_file.write("BREW_STYLE = '" + str(BREW_STYLE) + "'\n")
+  settings_file.write("BREW_METHOD = '" + str(BREW_METHOD) + "'\n")
 
   settings_file.close()
 
   return
+
+#write program start info to database##########################################
+def init_database():
+
+  from datetime import datetime
+
+  database_file = open("database.csv", "a")
+
+  database_file.write("bcc.py " + str(VERSION) + " started: " + str(datetime.now()) + "\n")
+  database_file.write(str(BREW_NAME)+", "+str(BREW_BATCH_NUM)+", "+str(BREW_BATCH_SIZE)+", "+str(BREW_STYLE)+", "+
+                      str(BREW_METHOD)+", "+str(Y_PROF_ID)+", "+str(Y_NAME)+"\n")
+
+  database_file.close()
+
+  return
+
+
+#write current status to database###############################################
+def write_database():
+  global PROGRAM_START_TIME,LAST_TIME_DATABASE,DATABASE_INTERVAL,Y_PROF_ID,HEATER_ON,COOLER_ON, ALARM_SYS_ON,IS_ALARM,ALARM_HIGH_TEMP,ALARM_LOW_TEMP,ALARM_COOLER_MALFUNC,ALARM_HEATER_MALFUNC, SMS_ALARM_ON,TEMP_SCALE
+
+  if time.time() - PROGRAM_START_TIME < 60: #wait for avg temp to stabilize
+    return
+
+  if time.time() - LAST_TIME_DATABASE < DATABASE_INTERVAL: #wait for database interval time to expire
+    return
+
+  from datetime import datetime
+
+  database_file = open("database.csv", "a") #open database file to append info
+
+  """
+Line format:
+column 01: date/time
+column 02: current avg_temp
+column 03: min temp
+column 04: max temp
+column 05: alarm max high
+column 06: alarm min low
+column 07: yeast ID
+column 08: heater on
+column 09: cooler on
+column 10: alarm sys on
+column 11: is alarm
+column 12: high temp alarm
+column 13: low temp alarm
+column 14: cooling malfunction
+column 15: heating malfunction
+column 16: send sms texts
+column 17: temperature scale
+
+  """
+
+  database_file.write(str(datetime.now()) + "," + str(BREW_CYCLE) + "," + str(round(O_trending.moving_avg_temp,4)) + "," + 
+                      str(round(MIN_TEMP,4)) + "," + str(round(MAX_TEMP,4)) + "," + 
+                      str(round(MIN_LOW_TEMP)) + "," + str(round(MAX_HIGH_TEMP)) + "," + str(Y_PROF_ID) + "," + 
+                      str(HEATER_ON) + "," + str(COOLER_ON) + "," + str(ALARM_SYS_ON) + "," + 
+                      str(IS_ALARM) + "," + str(ALARM_HIGH_TEMP) + "," + str(ALARM_LOW_TEMP) + "," + 
+                      str(ALARM_COOLER_MALFUNC) + "," + str(ALARM_HEATER_MALFUNC) + "," + 
+                      str(SMS_ALARM_ON) + "," + str(TEMP_SCALE) + "\n")
+
+  database_file.close()
+
+  LAST_TIME_DATABASE = time.time()
+
+  return
+
+#update current status to database###############################################
+def update_database():
+  global PROGRAM_START_TIME,LAST_TIME_DATABASE,DATABASE_INTERVAL,Y_PROF_ID,HEATER_ON,COOLER_ON, ALARM_SYS_ON,IS_ALARM,ALARM_HIGH_TEMP,ALARM_LOW_TEMP,ALARM_COOLER_MALFUNC,ALARM_HEATER_MALFUNC, SMS_ALARM_ON,TEMP_SCALE
+
+  from datetime import datetime
+
+  if time.time() - PROGRAM_START_TIME < 60: #wait for avg temp to stabilize
+    return
+
+  database_file = open("database.csv", "a") #open database file to append info
+
+  """
+Line format:
+column 01: date/time
+column 02: current avg_temp
+column 03: min temp
+column 04: max temp
+column 05: alarm max high
+column 06: alarm min low
+column 07: yeast ID
+column 08: heater on
+column 09: cooler on
+column 10: alarm sys on
+column 11: is alarm
+column 12: high temp alarm
+column 13: low temp alarm
+column 14: cooling malfunction
+column 15: heating malfunction
+column 16: send sms texts
+column 17: temperature scale
+
+  """
+
+  database_file.write(str(datetime.now()) + "," + str(BREW_CYCLE) + "," + str(round(O_trending.moving_avg_temp,4)) + "," + 
+                      str(round(MIN_TEMP,4)) + "," + str(round(MAX_TEMP,4)) + "," + 
+                      str(round(MIN_LOW_TEMP)) + "," + str(round(MAX_HIGH_TEMP)) + "," + str(Y_PROF_ID) + "," + 
+                      str(HEATER_ON) + "," + str(COOLER_ON) + "," + str(ALARM_SYS_ON) + "," + 
+                      str(IS_ALARM) + "," + str(ALARM_HIGH_TEMP) + "," + str(ALARM_LOW_TEMP) + "," + 
+                      str(ALARM_COOLER_MALFUNC) + "," + str(ALARM_HEATER_MALFUNC) + "," + 
+                      str(SMS_ALARM_ON) + "," + str(TEMP_SCALE) + "\n")
+
+  database_file.close()
+
+  return
+
+
 ########### MAIN PROGRAM STARTS HERE #####################################
 self_test()
 
@@ -966,6 +1190,9 @@ draw_screen()
 
 O_trending = Trend()
 move_average = O_trending.move_average
+
+#write program start info to database
+init_database()
 
 #main program loop##########################################
 _input = 1
@@ -992,13 +1219,13 @@ while _input > 0:
     #update the screen
     print_output()
 
+    #write to database file
+    write_database()
+
     #15 second delay/indicate the program is running/check for user input
     delay_loop()
 
-    #clear line 10 of the screen
-    #print "\033[10;0H\033[0K\n"
-
-exit(0)
+exit(0) #should never get here but just in case exit
 
 
 
