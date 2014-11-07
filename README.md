@@ -28,8 +28,11 @@ SELECTING AND AUTOMATING THE PROCESS
     ( )Network access (SSH, WWW and/or VNC for GUI) to the controller
         ( )Private access for control of the process
         ( )Public access for monitoring the process 
-    ( )Alarm system sends texts/emails/tweets etc. 
-    ( )MySQL database to track history/store yeast statistics etc.
+        (*)SSH
+	(*)VNC
+    (*)Alarm system sends texts/emails/tweets etc. 
+    (*)CSV database to track history/store yeast statistics etc.
+    (*)Plot charts of brew session data
 
 OTHER THINGS TO MONITOR
 
@@ -48,5 +51,5 @@ OTHER THINGS TO MONITOR
 LOCAL INPUT GUI DEVICE
 
     ( )Local LCD touchscreen GUI 
-       (doubles the expense but gives a nice 
-        professional finishing touch)
+       doubles the expense but gives a nice 
+       professional finishing touch
