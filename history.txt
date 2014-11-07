@@ -1,6 +1,12 @@
 Version History
 ~~~~~~~~~~~~~~~
 
+#0.07.0a (07 NOV 2014)
+- Added gnuplot charting of avg temperature
+- Added date time to bcc.py display
+- Updated user manual
+
+
 #0.06.0a (31 Oct 2014)
 - Fixed minor display bug with alarm status display when SMS texts were sent
 - Fixed bug where sometimes the high temp alarm was on but the cooler was not

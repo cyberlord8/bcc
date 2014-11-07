@@ -37,8 +37,8 @@ A list of things to do for the bcc project. The number in parenthesis is the pri
 
 
 * (2)Database
-	- _ Save readings
-	- _ Document when settings changed
+	- X Save readings
+	- X Document when settings changed
 	- X Yeast strains and recommended temperatures
 	- _ Beer styles 
 
@@ -57,7 +57,9 @@ A list of things to do for the bcc project. The number in parenthesis is the pri
 	- _ CO2 Sensor/Gas Pressure Sensor
 
 * (3)Chart the Brew Process
-	- _ gnuplot?
+	- X Install gnuplot
+	- _ Save brew session readings in session database
+	- _ Chart brew session
 	
 
 

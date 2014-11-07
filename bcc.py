@@ -1,9 +1,11 @@
 #!/usr/bin/python
-#This program is designed to run on a Beaglebone Black. 
-#You will need to install the Adafruit BBB-IO Python library.
+# This program is designed to run on a Beaglebone Black. 
+# You will need to install the Adafruit BBB-IO Python library.
+# If you want to use charting you will also need to install gnuplot and gnuplot-x11
 #
-#Licensing is as follows:
-#http://opensource.org/licenses/GPL-3.0
+# Licensing is as follows:
+# http://opensource.org/licenses/GPL-3.0
+
 """
     bcc.py - Beer brewing temperature controller
     Copyright (C) 2014,  Timothy J. Millea
@@ -34,7 +36,7 @@ import os
 ######### GLOBAL VARIABLE START HERE ##############################
 #set version number
 #major release . minor release . bugfix
-VERSION = "v0.06.0a"
+VERSION = "v0.07.0a"
 
 #set Celsius to kelvin constant
 c2kelvin = 273.15
@@ -62,6 +64,7 @@ BREW_BATCH_NUM = "none"
 BREW_BATCH_SIZE = 0.0
 BREW_STYLE = "none"
 BREW_METHOD = "none"
+BREW_SESSION_FILENAME = "none"
 
 #other global variables
 HEATER_ON = False #initialize HEATER_ON to False
@@ -72,6 +75,13 @@ COOLER_TIME = 5 * 60 #5 minutes * 60 seconds
 
 LAST_TIME_DATABASE = 0 #variable to track last database update was made
 DATABASE_INTERVAL = 15 * 60 #15 minutes * 60 seconds
+
+LAST_BREW_SESSION_TIME = 0
+CHARTING_ON = False
+CHARTING_INTERVAL = 1 * 60 #15 minutes - adjustable in program
+DATA_TO_PLOT = False
+NUM_DATA_POINTS = 0
+PLOT_STARTED = False
 
 current_temperature = 0
 
@@ -141,6 +151,9 @@ def check_input():
     if key_input[0] == 'f' or key_input[0] == 'F':
       draw_screen()
 
+    if key_input[0] == 'g' or key_input[0] == 'G':
+      chart_graphics()
+
     if key_input[0] == 'l' or key_input[0] == 'L':
       lager()
 
@@ -181,12 +194,42 @@ def check_input():
 
   return
 
+#charting options######################################################################
+def chart_graphics():
+
+  global CHARTING_ON,CHARTING_INTERVAL
+
+  while True:
+    print "\033[17;0H\033[0K\033[16;0H"
+    try:
+      charting_on = raw_input("Turn charting graphics on (yes/no): ")
+      break
+    except:
+      print "Enter yes or no"
+
+  if charting_on.lower() == "yes":
+    CHARTING_ON = True
+    while True:
+      print "\033[17;0H\033[0K\033[16;0H"
+      try:
+        minutes = input("Enter charting interval in minutes: ")
+        break
+      except:
+        print "Enter a number"
+    CHARTING_INTERVAL = minutes * 60 #convert to seconds
+  else: CHARTING_ON = False
+
+  return
+
 #get_brew_info#########################################################################
 #get information about brew session from user
 def get_brew_info():
-  global BREW_NAME,BREW_BATCH_NUM,BREW_BATCH_SIZE,BREW_STYLE,BREW_METHOD,Y_PROF_ID,BREW_CYCLE
+  global BREW_NAME,BREW_BATCH_NUM,BREW_BATCH_SIZE,BREW_STYLE,BREW_METHOD,Y_PROF_ID,BREW_CYCLE,BREW_SESSION_FILENAME, \
+         PLOT_STARTED,NUM_DATA_POINTS,DATA_TO_PLOT
 
   from datetime import datetime
+
+  print "\033[16;0H\033[0KThis will start a new brew session."
 
   while True:
     print "\033[17;0H\033[0K\033[16;0H"
@@ -240,6 +283,14 @@ def get_brew_info():
   BREW_CYCLE = "Off  "
 
   reset_min_max()
+  DATA_TO_PLOT = False
+  NUM_DATA_POINTS = 0
+  PLOT_STARTED = False
+
+
+  BREW_SESSION_FILENAME = './data/'+BREW_NAME + '-' + BREW_BATCH_NUM + '-' + str(BREW_BATCH_SIZE) + '-' + BREW_STYLE + '-' + BREW_METHOD
+
+  init_brew_session()
 
   return
 
@@ -504,7 +555,7 @@ def set_alarm_thresholds():
     print "\033[17;0H\033[0K\033[16;0H"
     try:
       user_input = raw_input("Alarm on (yes/no): ")
-      if (user_input == "yes"):
+      if (user_input.lower() == "yes"):
         ALARM_SYS_ON = True
       else: 
         ALARM_SYS_ON = False
@@ -940,17 +991,19 @@ def reset_min_max():
 #draw screen##############################################################
 def draw_screen():
 
+  from datetime import datetime
+
   print "\033[2J" #clear screen
   print "\033[2;0HBREW CHAMBER CONTROLLER",VERSION
-  print "\033[3;0H~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
+  print "\033[3;0H~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
   print "\033[4;0HBy: My BBB Projects"
 
   print "\033[5;0H"
   print "\033[6;0H-----------------------=MENU=---------------------"
   print "\033[7;0H| S - Scale(C/F) | A - Alarms    | C - Clear     |"     
-  print "\033[8;0H| T - Set Temp   | B - Brew Info | L - Lager     |"
+  print "\033[8;0H| T - Set Temp   | B - New Brew  | L - Lager     |"
   print "\033[9;0H| D - Set Dwell  | F - Refresh   | N - Normal    |"
-  print "\033[10;0H| Y - Yeast Prof |               | O - Off       |"
+  print "\033[10;0H| Y - Yeast Prof | G - Graphics  | O - Off       |"
   print "\033[11;0H|                |               | R - Crash     |"
   print "\033[12;0H|                |               | W - Warm      |"
   print "\033[13;0H|                |               |               |"
@@ -986,8 +1039,8 @@ def draw_screen():
 
   print "\033[24;77H\033[0K |  Dwell:    "
   print "\033[25;77H\033[0K |  Cell: "+CELL_NUMBER
-  print "\033[26;77H\033[0K |            "
-  print "\033[27;77H\033[0K |            "
+  print "\033[26;77H\033[0K |  "+str(datetime.now().strftime("%Y-%m-%d %H:%M"))
+  print "\033[27;77H\033[0K |  Charts: "
   print "\033[28;77H\033[0K |            "
 
   print "\033[29;0H\033[0K YEAST PROFILE"
@@ -997,13 +1050,12 @@ def draw_screen():
   print "\033[33;0H\033[0K BREW INFO"
   print "\033[34;0H\033[0K",BREW_NAME,"|",BREW_BATCH_NUM,"|",BREW_BATCH_SIZE,"|",BREW_STYLE,"|",BREW_METHOD
 
-
-  #print "\n\n"
-  #exit(0)
   return
 
 #print output#######################################################
 def print_output():
+
+  from datetime import datetime
 
   #print the variables
   print "\033[24;13H",BREW_CYCLE
@@ -1022,7 +1074,14 @@ def print_output():
   print "\033[27;71H",round(O_trending.temp4,1)
   print "\033[28;71H",round(O_trending.moving_avg_temp,1)
 
+  print "\033[26;77H\033[0K |  "+str(datetime.now().strftime("%Y-%m-%d %H:%M"))
+
+  if CHARTING_ON:
+    print "\033[27;77H\033[0K |  Charts: ON - "+str(CHARTING_INTERVAL/60)
+  else: print "\033[27;77H\033[0K |  Charts: OFF"
+
   print "\033[24;88H\033[0K",round(DWELL,1)
+
 
   print "\033[30;0H\033[0K",Y_PROF_ID,"|",Y_LAB,"|",Y_NUM,"|",Y_NAME,"|",Y_STYLE,"|",round(Y_LOW_TEMP,1),"|",round(Y_HIGH_TEMP,1)
   print "\033[31;0H\033[0K",Y_DESC
@@ -1031,6 +1090,143 @@ def print_output():
 
 
 ######### DATABASE FUNCTIONS ###################################################
+
+#init brew session file ####################################################
+def init_brew_session():
+  global Y_LOW_TEMP,Y_HIGH_TEMP,LOW_TEMP,HIGH_TEMP,BREW_SESSION_FILENAME,LAST_BREW_SESSION_TIME,CHARTING_ON
+
+  if not CHARTING_ON:
+    return
+
+  LAST_BREW_SESSION_TIME = 0
+
+  #decide what range to use for the y axis - use the larger value
+  if Y_LOW_TEMP < MIN_TEMP: low_scale_temp = round(Y_LOW_TEMP,2)
+  else: low_scale_temp = round(MIN_TEMP,2)
+
+  if Y_HIGH_TEMP > MAX_TEMP: high_scale_temp = round(Y_HIGH_TEMP,2)
+  else: high_scale_temp = round(MAX_TEMP,2)
+
+  brew_session_program_file = open(BREW_SESSION_FILENAME+".gp", "w")#create the brew session gnuplot script
+
+  brew_session_program_file.write("#!/usr/bin/gnuplot\n")
+  brew_session_program_file.write("# bcc.py created gnuplot file\n")
+  brew_session_program_file.write("#\n\n")
+  brew_session_program_file.write("reset\n")
+  brew_session_program_file.write("set xdata time\n")
+  brew_session_program_file.write("set xrange[*:*]\n")
+  brew_session_program_file.write("set timefmt \"%Y-%m-%d %H:%M:%S\"\n")
+  brew_session_program_file.write("set yrange["+str(low_scale_temp-5)+":"+str(high_scale_temp+5)+"]\n")
+  brew_session_program_file.write("set mytics 5\n")
+  brew_session_program_file.write("set xtics 1\n")
+  brew_session_program_file.write("set datafile separator \",\"\n")
+  brew_session_program_file.write("set title \""+BREW_SESSION_FILENAME+"\"\n")
+  brew_session_program_file.write("set xlabel \"Time\"\n")
+  brew_session_program_file.write("set ylabel \"Temperature\"\n")
+  brew_session_program_file.write("set grid\n")
+  brew_session_program_file.write("plot \'"+BREW_SESSION_FILENAME+".dat\' using 1:2 title \"Avg Temp\" with lines\n")
+  brew_session_program_file.write("replot \'"+BREW_SESSION_FILENAME+".dat\' using 1:2 title \"Smoothed\" smooth bezier with lines\n")
+  brew_session_program_file.write("replot \'"+BREW_SESSION_FILENAME+".dat\' using 1:3 title \"Min Temp\" with lines\n")
+  brew_session_program_file.write("replot \'"+BREW_SESSION_FILENAME+".dat\' using 1:4 title \"Max Temp\" with lines\n")
+  brew_session_program_file.write("replot \'"+BREW_SESSION_FILENAME+".dat\' using 1:5 title \"Des Temp\" with lines\n")
+  brew_session_program_file.write("replot \'"+BREW_SESSION_FILENAME+".dat\' using 1:6 title \"Hi Alarm\" with lines\n")
+  brew_session_program_file.write("replot \'"+BREW_SESSION_FILENAME+".dat\' using 1:7 title \"Lo Alarm\" with lines\n")
+
+#  brew_session_program_file.write("pause 1\n")
+
+
+  brew_session_program_file.close()
+
+  brew_session_data_file = open(BREW_SESSION_FILENAME+".dat", "w")#create the brew session database
+  brew_session_data_file.close()
+
+  return
+
+#update brew session file ####################################################
+def update_brew_session():
+  global Y_LOW_TEMP,Y_HIGH_TEMP,MIN_TEMP,MAX_TEMP,BREW_SESSION_FILENAME,CHARTING_ON
+
+  if not CHARTING_ON:
+    return
+
+  #decide what range to use for the y axis - use the larger value
+  if Y_LOW_TEMP < MIN_TEMP: low_scale_temp = round(Y_LOW_TEMP,2)
+  else: low_scale_temp = round(MIN_TEMP,2)
+
+  if Y_HIGH_TEMP > MAX_TEMP: high_scale_temp = round(Y_HIGH_TEMP,2)
+  else: high_scale_temp = round(MAX_TEMP,2)
+
+  brew_session_program_file = open(BREW_SESSION_FILENAME+".gp", "w")#create the brew session gnuplot script
+
+  brew_session_program_file.write("#!/usr/bin/gnuplot\n")
+  brew_session_program_file.write("# bcc.py created gnuplot file\n")
+  brew_session_program_file.write("#\n\n")
+  brew_session_program_file.write("reset\n")
+  brew_session_program_file.write("set xdata time\n")
+  brew_session_program_file.write("set format x \"%H:%M\"\n")
+  brew_session_program_file.write("set xrange[*:*]\n")
+  brew_session_program_file.write("set timefmt \"%Y-%m-%d %H:%M:%S\"\n")
+  brew_session_program_file.write("set yrange["+str(low_scale_temp-5)+":"+str(high_scale_temp+5)+"]\n")
+  brew_session_program_file.write("set mytics 5\n")
+  brew_session_program_file.write("set datafile separator \",\"\n")
+  brew_session_program_file.write("set title \""+BREW_SESSION_FILENAME+"\\n"+Y_NAME+"\"\n")
+  brew_session_program_file.write("set xlabel \"Time\"\n")
+  brew_session_program_file.write("set ylabel \"Temperature\"\n")
+  brew_session_program_file.write("set grid\n")
+  brew_session_program_file.write("plot \'"+BREW_SESSION_FILENAME+".dat\' using 1:2 title \"Avg Temp\" with lines\n")
+  brew_session_program_file.write("replot \'"+BREW_SESSION_FILENAME+".dat\' using 1:2 title \"Smoothed\" smooth bezier with lines\n")
+  brew_session_program_file.write("replot \'"+BREW_SESSION_FILENAME+".dat\' using 1:3 title \"Min Temp\" with lines\n")
+  brew_session_program_file.write("replot \'"+BREW_SESSION_FILENAME+".dat\' using 1:4 title \"Max Temp\" with lines\n")
+  brew_session_program_file.write("replot \'"+BREW_SESSION_FILENAME+".dat\' using 1:5 title \"Des Temp\" with lines\n")
+  brew_session_program_file.write("replot \'"+BREW_SESSION_FILENAME+".dat\' using 1:6 title \"Hi Alarm\" with lines\n")
+  brew_session_program_file.write("replot \'"+BREW_SESSION_FILENAME+".dat\' using 1:7 title \"Lo Alarm\" with lines\n")
+
+#  brew_session_program_file.write("pause 1\n")
+
+  brew_session_program_file.close()
+
+  return
+
+#write brew session data to file ####################################################
+def write_brew_session():
+  global LAST_BREW_SESSION_TIME,DATA_TO_PLOT,NUM_DATA_POINTS,PLOT_STARTED
+
+
+  if not CHARTING_ON:
+    return
+
+  from datetime import datetime
+
+  if not PLOT_STARTED and DATA_TO_PLOT:
+    from threading import Thread
+    t = Thread(target=gnuplot_thread,args=())
+    t.start()
+    PLOT_STARTED = True
+  
+  if time.time() - PROGRAM_START_TIME < 60: #wait for avg temp to stabilize
+    return
+
+  if time.time() - LAST_BREW_SESSION_TIME < CHARTING_INTERVAL: #wait for interval time
+    return
+
+  if BREW_CYCLE == "Off  ":#No need to update session data if crew cycle is off
+    return
+
+  brew_session_file = open(BREW_SESSION_FILENAME+".dat", "a")#open the brew session database
+
+#log timestamp, current avg temp, min temp, and max temp to data file
+  brew_session_file.write(str(datetime.now()) + "," + str(round(O_trending.moving_avg_temp,4)) + "," + str(round(MIN_TEMP,4)) + "," + str(round(MAX_TEMP,4)) + "," + str(round(DESIRED_TEMP,4))+ "," + str(round(MAX_HIGH_TEMP,4)) + "," + str(round(MIN_LOW_TEMP,4)) +"\n")
+
+  brew_session_file.close()#close the data file
+
+  LAST_BREW_SESSION_TIME = time.time()#log time brew session data file was updated
+
+  if NUM_DATA_POINTS < 2:
+    NUM_DATA_POINTS += 1
+    if NUM_DATA_POINTS > 1:
+      DATA_TO_PLOT = True
+      
+  return
 
 #write settings to file ########################################################
 def write_settings():
@@ -1066,6 +1262,10 @@ def write_settings():
   settings_file.write("BREW_BATCH_SIZE = " + str(BREW_BATCH_SIZE) + "\n")
   settings_file.write("BREW_STYLE = '" + str(BREW_STYLE) + "'\n")
   settings_file.write("BREW_METHOD = '" + str(BREW_METHOD) + "'\n")
+  settings_file.write("BREW_SESSION_FILENAME = '" + str(BREW_SESSION_FILENAME) + "'\n")
+  settings_file.write("CHARTING_ON = " + str(CHARTING_ON) + "\n")
+  settings_file.write("CHARTING_INTERVAL = " + str(CHARTING_INTERVAL) + "\n")
+  settings_file.write("DATA_TO_PLOT = " + str(DATA_TO_PLOT) + "\n")
 
   settings_file.close()
 
@@ -1089,9 +1289,12 @@ def init_database():
 
 #write current status to database###############################################
 def write_database():
-  global PROGRAM_START_TIME,LAST_TIME_DATABASE,DATABASE_INTERVAL,Y_PROF_ID,HEATER_ON,COOLER_ON, ALARM_SYS_ON,IS_ALARM,ALARM_HIGH_TEMP,ALARM_LOW_TEMP,ALARM_COOLER_MALFUNC,ALARM_HEATER_MALFUNC, SMS_ALARM_ON,TEMP_SCALE
+  global PROGRAM_START_TIME,LAST_TIME_DATABASE,DATABASE_INTERVAL,Y_PROF_ID,HEATER_ON,COOLER_ON, ALARM_SYS_ON,IS_ALARM,ALARM_HIGH_TEMP,ALARM_LOW_TEMP,ALARM_COOLER_MALFUNC,ALARM_HEATER_MALFUNC, SMS_ALARM_ON,TEMP_SCALE,BREW_CYCLE
 
   if time.time() - PROGRAM_START_TIME < 60: #wait for avg temp to stabilize
+    return
+
+  if BREW_CYCLE == "Off  ":#No need to update database if crew cycle is off
     return
 
   if time.time() - LAST_TIME_DATABASE < DATABASE_INTERVAL: #wait for database interval time to expire
@@ -1139,12 +1342,16 @@ column 17: temperature scale
 
 #update current status to database###############################################
 def update_database():
-  global PROGRAM_START_TIME,LAST_TIME_DATABASE,DATABASE_INTERVAL,Y_PROF_ID,HEATER_ON,COOLER_ON, ALARM_SYS_ON,IS_ALARM,ALARM_HIGH_TEMP,ALARM_LOW_TEMP,ALARM_COOLER_MALFUNC,ALARM_HEATER_MALFUNC, SMS_ALARM_ON,TEMP_SCALE
+  global PROGRAM_START_TIME,LAST_TIME_DATABASE,DATABASE_INTERVAL,Y_PROF_ID,HEATER_ON,COOLER_ON, ALARM_SYS_ON,IS_ALARM,ALARM_HIGH_TEMP,ALARM_LOW_TEMP,ALARM_COOLER_MALFUNC,ALARM_HEATER_MALFUNC, SMS_ALARM_ON,TEMP_SCALE,BREW_CYCLE
 
   from datetime import datetime
 
   if time.time() - PROGRAM_START_TIME < 60: #wait for avg temp to stabilize
     return
+
+  if BREW_CYCLE == "Off  ":#No need to update database if crew cycle is off
+    return
+
 
   database_file = open("database.csv", "a") #open database file to append info
 
@@ -1183,6 +1390,19 @@ column 17: temperature scale
   return
 
 
+# gnuplot_thread() #######################################################
+def gnuplot_thread():
+  global DATA_TO_PLOT
+
+  from os import system
+
+  while not DATA_TO_PLOT:
+    time.sleep(60)
+
+  system( '/usr/bin/gnuplot \''+BREW_SESSION_FILENAME+'.gp\'')
+
+  return
+
 ########### MAIN PROGRAM STARTS HERE #####################################
 self_test()
 
@@ -1195,6 +1415,7 @@ move_average = O_trending.move_average
 init_database()
 
 #main program loop##########################################
+
 _input = 1
 while _input > 0:
 
@@ -1221,6 +1442,12 @@ while _input > 0:
 
     #write to database file
     write_database()
+
+    #write the brew session data to the data file
+    write_brew_session()
+
+    #update brew session gnuplot script
+    update_brew_session()
 
     #15 second delay/indicate the program is running/check for user input
     delay_loop()
