@@ -290,7 +290,7 @@ def get_brew_info():
 
   BREW_SESSION_FILENAME = './data/'+BREW_NAME + '-' + BREW_BATCH_NUM + '-' + str(BREW_BATCH_SIZE) + '-' + BREW_STYLE + '-' + BREW_METHOD
 
-  init_brew_session()
+  init_gnuplot_script()
 
   return
 
@@ -640,6 +640,7 @@ def set_desired_temp():
 def exit_program():
 
   from datetime import datetime
+  from os import system
 
   print "\033[15;0H"
 
@@ -652,6 +653,9 @@ def exit_program():
   database_file.write("bcc.py exiting normally: " + str(datetime.now()) + "\n")
 
   database_file.close()
+
+  print "Killing gnuplot script..."
+  system("pkill -9 gnuplot")
 
   print "Exiting program..."
   time.sleep(2)
@@ -1091,8 +1095,8 @@ def print_output():
 
 ######### DATABASE FUNCTIONS ###################################################
 
-#init brew session file ####################################################
-def init_brew_session():
+#init gnuplot script ####################################################
+def init_gnuplot_script():
   global Y_LOW_TEMP,Y_HIGH_TEMP,LOW_TEMP,HIGH_TEMP,BREW_SESSION_FILENAME,LAST_BREW_SESSION_TIME,CHARTING_ON
 
   if not CHARTING_ON:
@@ -1107,43 +1111,45 @@ def init_brew_session():
   if Y_HIGH_TEMP > MAX_TEMP: high_scale_temp = round(Y_HIGH_TEMP,2)
   else: high_scale_temp = round(MAX_TEMP,2)
 
-  brew_session_program_file = open(BREW_SESSION_FILENAME+".gp", "w")#create the brew session gnuplot script
+  gnuplot_script_file = open(BREW_SESSION_FILENAME+".gp", "w")#create the brew session gnuplot script
 
-  brew_session_program_file.write("#!/usr/bin/gnuplot\n")
-  brew_session_program_file.write("# bcc.py created gnuplot file\n")
-  brew_session_program_file.write("#\n\n")
-  brew_session_program_file.write("reset\n")
-  brew_session_program_file.write("set xdata time\n")
-  brew_session_program_file.write("set xrange[*:*]\n")
-  brew_session_program_file.write("set timefmt \"%Y-%m-%d %H:%M:%S\"\n")
-  brew_session_program_file.write("set yrange["+str(low_scale_temp-5)+":"+str(high_scale_temp+5)+"]\n")
-  brew_session_program_file.write("set mytics 5\n")
-  brew_session_program_file.write("set xtics 1\n")
-  brew_session_program_file.write("set datafile separator \",\"\n")
-  brew_session_program_file.write("set title \""+BREW_SESSION_FILENAME+"\"\n")
-  brew_session_program_file.write("set xlabel \"Time\"\n")
-  brew_session_program_file.write("set ylabel \"Temperature\"\n")
-  brew_session_program_file.write("set grid\n")
-  brew_session_program_file.write("plot \'"+BREW_SESSION_FILENAME+".dat\' using 1:2 title \"Avg Temp\" with lines\n")
-  brew_session_program_file.write("replot \'"+BREW_SESSION_FILENAME+".dat\' using 1:2 title \"Smoothed\" smooth bezier with lines\n")
-  brew_session_program_file.write("replot \'"+BREW_SESSION_FILENAME+".dat\' using 1:3 title \"Min Temp\" with lines\n")
-  brew_session_program_file.write("replot \'"+BREW_SESSION_FILENAME+".dat\' using 1:4 title \"Max Temp\" with lines\n")
-  brew_session_program_file.write("replot \'"+BREW_SESSION_FILENAME+".dat\' using 1:5 title \"Des Temp\" with lines\n")
-  brew_session_program_file.write("replot \'"+BREW_SESSION_FILENAME+".dat\' using 1:6 title \"Hi Alarm\" with lines\n")
-  brew_session_program_file.write("replot \'"+BREW_SESSION_FILENAME+".dat\' using 1:7 title \"Lo Alarm\" with lines\n")
+  gnuplot_script_file.write("#!/usr/bin/gnuplot\n")
+  gnuplot_script_file.write("# bcc.py created gnuplot file\n")
+  gnuplot_script_file.write("#\n\n")
+  gnuplot_script_file.write("reset\n")
+  gnuplot_script_file.write("set xdata time\n")
+  gnuplot_script_file.write("set xrange[*:*]\n")
+  gnuplot_script_file.write("set timefmt \"%Y-%m-%d %H:%M:%S\"\n")
+  gnuplot_script_file.write("set yrange["+str(low_scale_temp-5)+":"+str(high_scale_temp+5)+"]\n")
+  gnuplot_script_file.write("set mytics 5\n")
+  gnuplot_script_file.write("set xtics 1\n")
+  gnuplot_script_file.write("set datafile separator \",\"\n")
+  gnuplot_script_file.write("set title \""+BREW_SESSION_FILENAME+"\"\n")
+  gnuplot_script_file.write("set xlabel \"Time\"\n")
+  gnuplot_script_file.write("set ylabel \"Temperature\"\n")
+  gnuplot_script_file.write("set grid\n")
+  gnuplot_script_file.write("plot \'"+BREW_SESSION_FILENAME+".dat\' using 1:2 title \"Avg Temp\" with lines\n")
+  gnuplot_script_file.write("replot \'"+BREW_SESSION_FILENAME+".dat\' using 1:2 title \"Smoothed\" smooth bezier with lines\n")
+  gnuplot_script_file.write("replot \'"+BREW_SESSION_FILENAME+".dat\' using 1:3 title \"Min Temp\" with lines\n")
+  gnuplot_script_file.write("replot \'"+BREW_SESSION_FILENAME+".dat\' using 1:4 title \"Max Temp\" with lines\n")
+  gnuplot_script_file.write("replot \'"+BREW_SESSION_FILENAME+".dat\' using 1:5 title \"Des Temp\" with lines\n")
+  gnuplot_script_file.write("replot \'"+BREW_SESSION_FILENAME+".dat\' using 1:6 title \"Hi Alarm\" with lines\n")
+  gnuplot_script_file.write("replot \'"+BREW_SESSION_FILENAME+".dat\' using 1:7 title \"Lo Alarm\" with lines\n")
+  gnuplot_script_file.write("pause "+str(CHARTING_INTERVAL)+"\n")
+  gnuplot_script_file.write("reread\n")
 
-#  brew_session_program_file.write("pause 1\n")
+#  gnuplot_script_file.write("pause 1\n")
 
 
-  brew_session_program_file.close()
+  gnuplot_script_file.close()
 
-  brew_session_data_file = open(BREW_SESSION_FILENAME+".dat", "w")#create the brew session database
-  brew_session_data_file.close()
+  gnuplot_script_data_file = open(BREW_SESSION_FILENAME+".dat", "w")#create the brew session database
+  gnuplot_script_data_file.close()
 
   return
 
-#update brew session file ####################################################
-def update_brew_session():
+#update gnuplot script ####################################################
+def update_gnuplot_script():
   global Y_LOW_TEMP,Y_HIGH_TEMP,MIN_TEMP,MAX_TEMP,BREW_SESSION_FILENAME,CHARTING_ON
 
   if not CHARTING_ON:
@@ -1156,39 +1162,41 @@ def update_brew_session():
   if Y_HIGH_TEMP > MAX_TEMP: high_scale_temp = round(Y_HIGH_TEMP,2)
   else: high_scale_temp = round(MAX_TEMP,2)
 
-  brew_session_program_file = open(BREW_SESSION_FILENAME+".gp", "w")#create the brew session gnuplot script
+  gnuplot_script_file = open(BREW_SESSION_FILENAME+".gp", "w")#create the brew session gnuplot script
 
-  brew_session_program_file.write("#!/usr/bin/gnuplot\n")
-  brew_session_program_file.write("# bcc.py created gnuplot file\n")
-  brew_session_program_file.write("#\n\n")
-  brew_session_program_file.write("reset\n")
-  brew_session_program_file.write("set xdata time\n")
-  brew_session_program_file.write("set format x \"%H:%M\"\n")
-  brew_session_program_file.write("set xrange[*:*]\n")
-  brew_session_program_file.write("set timefmt \"%Y-%m-%d %H:%M:%S\"\n")
-  brew_session_program_file.write("set yrange["+str(low_scale_temp-5)+":"+str(high_scale_temp+5)+"]\n")
-  brew_session_program_file.write("set mytics 5\n")
-  brew_session_program_file.write("set datafile separator \",\"\n")
-  brew_session_program_file.write("set title \""+BREW_SESSION_FILENAME+"\\n"+Y_NAME+"\"\n")
-  brew_session_program_file.write("set xlabel \"Time\"\n")
-  brew_session_program_file.write("set ylabel \"Temperature\"\n")
-  brew_session_program_file.write("set grid\n")
-  brew_session_program_file.write("plot \'"+BREW_SESSION_FILENAME+".dat\' using 1:2 title \"Avg Temp\" with lines\n")
-  brew_session_program_file.write("replot \'"+BREW_SESSION_FILENAME+".dat\' using 1:2 title \"Smoothed\" smooth bezier with lines\n")
-  brew_session_program_file.write("replot \'"+BREW_SESSION_FILENAME+".dat\' using 1:3 title \"Min Temp\" with lines\n")
-  brew_session_program_file.write("replot \'"+BREW_SESSION_FILENAME+".dat\' using 1:4 title \"Max Temp\" with lines\n")
-  brew_session_program_file.write("replot \'"+BREW_SESSION_FILENAME+".dat\' using 1:5 title \"Des Temp\" with lines\n")
-  brew_session_program_file.write("replot \'"+BREW_SESSION_FILENAME+".dat\' using 1:6 title \"Hi Alarm\" with lines\n")
-  brew_session_program_file.write("replot \'"+BREW_SESSION_FILENAME+".dat\' using 1:7 title \"Lo Alarm\" with lines\n")
+  gnuplot_script_file.write("#!/usr/bin/gnuplot\n")
+  gnuplot_script_file.write("# bcc.py created gnuplot file\n")
+  gnuplot_script_file.write("#\n\n")
+  gnuplot_script_file.write("reset\n")
+  gnuplot_script_file.write("set xdata time\n")
+  gnuplot_script_file.write("set format x \"%H:%M\"\n")
+  gnuplot_script_file.write("set xrange[*:*]\n")
+  gnuplot_script_file.write("set timefmt \"%Y-%m-%d %H:%M:%S\"\n")
+  gnuplot_script_file.write("set yrange["+str(low_scale_temp-5)+":"+str(high_scale_temp+5)+"]\n")
+  gnuplot_script_file.write("set mytics 5\n")
+  gnuplot_script_file.write("set datafile separator \",\"\n")
+  gnuplot_script_file.write("set title \""+BREW_SESSION_FILENAME+"\\n"+Y_NAME+"\"\n")
+  gnuplot_script_file.write("set xlabel \"Time\"\n")
+  gnuplot_script_file.write("set ylabel \"Temperature\"\n")
+  gnuplot_script_file.write("set grid\n")
+  gnuplot_script_file.write("plot \'"+BREW_SESSION_FILENAME+".dat\' using 1:2 title \"Avg Temp\" with lines\n")
+  gnuplot_script_file.write("replot \'"+BREW_SESSION_FILENAME+".dat\' using 1:2 title \"Smoothed\" smooth bezier with lines\n")
+  gnuplot_script_file.write("replot \'"+BREW_SESSION_FILENAME+".dat\' using 1:3 title \"Min Temp\" with lines\n")
+  gnuplot_script_file.write("replot \'"+BREW_SESSION_FILENAME+".dat\' using 1:4 title \"Max Temp\" with lines\n")
+  gnuplot_script_file.write("replot \'"+BREW_SESSION_FILENAME+".dat\' using 1:5 title \"Des Temp\" with lines\n")
+  gnuplot_script_file.write("replot \'"+BREW_SESSION_FILENAME+".dat\' using 1:6 title \"Hi Alarm\" with lines\n")
+  gnuplot_script_file.write("replot \'"+BREW_SESSION_FILENAME+".dat\' using 1:7 title \"Lo Alarm\" with lines\n")
+  gnuplot_script_file.write("pause "+str(CHARTING_INTERVAL)+"\n")
+  gnuplot_script_file.write("reread\n")
 
-#  brew_session_program_file.write("pause 1\n")
+#  gnuplot_script_file.write("pause 1\n")
 
-  brew_session_program_file.close()
+  gnuplot_script_file.close()
 
   return
 
 #write brew session data to file ####################################################
-def write_brew_session():
+def write_gnuplot_script():
   global LAST_BREW_SESSION_TIME,DATA_TO_PLOT,NUM_DATA_POINTS,PLOT_STARTED
 
 
@@ -1212,12 +1220,12 @@ def write_brew_session():
   if BREW_CYCLE == "Off  ":#No need to update session data if crew cycle is off
     return
 
-  brew_session_file = open(BREW_SESSION_FILENAME+".dat", "a")#open the brew session database
+  gnuplot_script_data_file = open(BREW_SESSION_FILENAME+".dat", "a")#open the brew session database
 
 #log timestamp, current avg temp, min temp, and max temp to data file
-  brew_session_file.write(str(datetime.now()) + "," + str(round(O_trending.moving_avg_temp,4)) + "," + str(round(MIN_TEMP,4)) + "," + str(round(MAX_TEMP,4)) + "," + str(round(DESIRED_TEMP,4))+ "," + str(round(MAX_HIGH_TEMP,4)) + "," + str(round(MIN_LOW_TEMP,4)) +"\n")
+  gnuplot_script_data_file.write(str(datetime.now().strftime("%Y-%m-%d %H:%M")) + "," + str(round(O_trending.moving_avg_temp,4)) + "," + str(round(MIN_TEMP,4)) + "," + str(round(MAX_TEMP,4)) + "," + str(round(DESIRED_TEMP,4))+ "," + str(round(MAX_HIGH_TEMP,4)) + "," + str(round(MIN_LOW_TEMP,4)) +"\n")
 
-  brew_session_file.close()#close the data file
+  gnuplot_script_data_file.close()#close the data file
 
   LAST_BREW_SESSION_TIME = time.time()#log time brew session data file was updated
 
@@ -1444,10 +1452,10 @@ while _input > 0:
     write_database()
 
     #write the brew session data to the data file
-    write_brew_session()
+    write_gnuplot_script()
 
     #update brew session gnuplot script
-    update_brew_session()
+    update_gnuplot_script()
 
     #15 second delay/indicate the program is running/check for user input
     delay_loop()
