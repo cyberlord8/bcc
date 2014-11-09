@@ -1,6 +1,13 @@
 Version History
 ~~~~~~~~~~~~~~~
 
+#0.07.05a (09 Nov 2014)
+- Updated bcc.py so if the settings file (bccconfig.py) does not exist it will not crash rudely.
+  . bcc.py will ask for your cell number and then create bccconfig.py
+  . If bccconfig.py gets corrupt for any reason it can just be deleted and it will be recreated when bcc.py is started
+  . All the features of bcc.py will be turned off at this point
+  . You will have to turn on the ones you want on (alarms, SMS text, charts, new brew session etc)
+
 #0.07.03a (08 Nov 2014)
 - Updated gnuplot script file to pause and reread the data which automatically refreshes the chart
 - Added code to kill the gnuplot script which was causing bcc.py not to exit

@@ -34,9 +34,19 @@ import csv
 import os
 
 ######### GLOBAL VARIABLE START HERE ##############################
+# Some of the global variables are written to bccconfig.py and imported
+# during the main program code at the bottom of this file.
+# There is no need to change any of these global defaults at the start
+# of the program.
+
+# The exception might be the CELL_NUMBER variable - change that to your cell number
+# but you could just as easily change it in bccconfig.py itself once it is created.
+
+CELL_NUMBER = '5555555555'
+
 #set version number
 #major release . minor release . bugfix
-VERSION = "v0.07.0a"
+VERSION = "v0.07.5a"
 
 #set Celsius to kelvin constant
 c2kelvin = 273.15
@@ -59,16 +69,31 @@ Y_HIGH_TEMP = 0 #recommended yeast high temp
 Y_DESC = "none"
 
 #brew info variables
-BREW_NAME = "none"
-BREW_BATCH_NUM = "none"
-BREW_BATCH_SIZE = 0.0
-BREW_STYLE = "none"
-BREW_METHOD = "none"
-BREW_SESSION_FILENAME = "none"
+BREW_CYCLE = "Off  "
+BREW_NAME = "none" #name this brew session
+BREW_BATCH_NUM = "none" #give it a batch number
+BREW_BATCH_SIZE = 0.0 #batch size in gallons or liters, doesn't matter as its not used (yet?)
+BREW_STYLE = "none" #Ale, Lager, whatever you are making
+BREW_METHOD = "none" #Method, Extract, All Grain, Brew in a Bag etc..
+BREW_SESSION_FILENAME = "none" #concatenated name from the above variables
 
 #other global variables
+MAX_HIGH_TEMP = 0
+MIN_LOW_TEMP = 0
 HEATER_ON = False #initialize HEATER_ON to False
 COOLER_ON = False #initialize COOLER_ON to false
+TEMP_SCALE = 'Fahrenheit'
+LAGER_TEMP = 45.0
+WARM_TEMP = 77.0
+NORM_TEMP = 71.0
+CRASH_TEMP =35.0
+CLEAR_TEMP =50.0
+DESIRED_TEMP = 65.0
+DWELL = 1.5
+MIN_TEMP = 0
+MAX_TEMP = 0
+SMS_ALARM_ON = False
+ALARM_SYS_ON = True
 
 TIME_LAST_COOLER = 0 #variable to track when cooler was last turned off
 COOLER_TIME = 5 * 60 #5 minutes * 60 seconds
@@ -77,29 +102,29 @@ LAST_TIME_DATABASE = 0 #variable to track last database update was made
 DATABASE_INTERVAL = 15 * 60 #15 minutes * 60 seconds
 
 LAST_BREW_SESSION_TIME = 0
-CHARTING_ON = False
+CHARTING_ON = False #variable to track whether charting feature is to be used or not
 CHARTING_INTERVAL = 1 * 60 #15 minutes - adjustable in program
-DATA_TO_PLOT = False
-NUM_DATA_POINTS = 0
-PLOT_STARTED = False
+DATA_TO_PLOT = False #boolean to track if 2 or more points of data are available to plot
+NUM_DATA_POINTS = 0 #tracks numer or data points up to two
+PLOT_STARTED = False #tracks whether the plot has been displayed or not
 
 current_temperature = 0
 
 #alarm variables:
-ALARM_SYS_ON = False
-IS_ALARM = False
-ALARM_HIGH_TEMP = False
-ALARM_LOW_TEMP = False
-ALARM_COOLER_MALFUNC = False
-ALARM_HEATER_MALFUNC = False
+ALARM_SYS_ON = False #boolean to track whether the alarm system is on or not
+IS_ALARM = False #boolean to track if there is an alarm or not
+ALARM_HIGH_TEMP = False #boolean to track a hi temp alarm
+ALARM_LOW_TEMP = False #boolean to track a low temp alarm
+ALARM_COOLER_MALFUNC = False #boolean to track a malfunction
+ALARM_HEATER_MALFUNC = False #boolean to track a malfunction
 TIME_LAST_SMS = 0 #used to track sms message interval
 SMS_INTERVAL = 60 * 60 #60minutes * 60 seconds
-SMS_ALARM_ON = False
+SMS_ALARM_ON = False #boolean to track whether SMS messages are to be sent or not
 
 TIME_BEFORE_ALARM_TRIGGER = 5 * 60 #(5 minutes in seconds)
 
 #used to wait for one minute to allow moving average temperature to stabilize
-PROGRAM_START_TIME = time.time()
+PROGRAM_START_TIME = time.time()# the date/time the program was started
 
 #thermistor constants used in polynomial equation
 T_a = 7.602330993E-4
@@ -112,21 +137,11 @@ GPIO.setup("P9_15", GPIO.OUT) #setup pin P9_48 as output pin HEATER
 GPIO.setup("P9_23", GPIO.OUT) #setup pin P9_49 as output pin COOLER
 
 
-#read in the settings file
-from bccconfig import *
-
-if TEMP_SCALE == "Celsius": #from import bccconfig above
-  USE_CELSIUS = True
-
-elif TEMP_SCALE == "Fahrenheit":
-  USE_CELSIUS = False
-
-
 ######### FUNCTIONS START HERE #####################################
 
 ######### AUTOMATION FUNCTIONS #####################################
 
-
+#none yet
 
 ######### USER INPUT FUNCTIONS #####################################
 
@@ -136,7 +151,7 @@ def check_input():
   if select.select([sys.stdin],[],[],0.0)[0]:
     key_input = sys.stdin.readline()
 
-    if key_input[0] == 'a' or key_input[0] == 'A':
+    if key_input[0] == 'a' or key_input[0] == 'A': #was an A typed at the terminal? etc...
       set_alarm_thresholds()
 
     if key_input[0] == 'b' or key_input[0] == 'B':
@@ -181,23 +196,24 @@ def check_input():
     if key_input[0] == 'y' or key_input[0] == 'Y':
       yeast_profile()
 
-    draw_screen()
-    print_output()
+    draw_screen()#redraw the screen to clean it up
+    print_output()#print data at specific points on the screen
 
-    check_alarms()
+    check_alarms()#check to see if we should trigger an alarm or not
 
-    heater_control(O_trending.moving_avg_temp)
-    cooler_control(O_trending.moving_avg_temp)
+    heater_control(O_trending.moving_avg_temp) #check to see if heater needs to be turned on or off
+    cooler_control(O_trending.moving_avg_temp) #check to see if cooler needs to be turned on or off
 
-    write_settings()
-    update_database()
+    write_settings() #update the settings file
+    update_database() #update the database
 
   return
 
 #charting options######################################################################
 def chart_graphics():
 
-  global CHARTING_ON,CHARTING_INTERVAL
+  global CHARTING_ON,CHARTING_INTERVAL,PLOT_STARTED
+  from os import system
 
   while True:
     print "\033[17;0H\033[0K\033[16;0H"
@@ -205,9 +221,9 @@ def chart_graphics():
       charting_on = raw_input("Turn charting graphics on (yes/no): ")
       break
     except:
-      print "Enter yes or no"
+      print "Enter yes or no:"
 
-  if charting_on.lower() == "yes":
+  if charting_on.lower() == "yes": #yes we want charts
     CHARTING_ON = True
     while True:
       print "\033[17;0H\033[0K\033[16;0H"
@@ -215,9 +231,13 @@ def chart_graphics():
         minutes = input("Enter charting interval in minutes: ")
         break
       except:
-        print "Enter a number"
+        print "Enter a number:"
     CHARTING_INTERVAL = minutes * 60 #convert to seconds
-  else: CHARTING_ON = False
+  else: 
+    CHARTING_ON = False #no... turn charting off
+
+  PLOT_STARTED = False #set to False so the chart will be reloaded with new interval timing if it was changed
+  system("pkill -9 gnuplot") #kill gnuplot so it loads again reading the new charting interval
 
   return
 
@@ -228,6 +248,7 @@ def get_brew_info():
          PLOT_STARTED,NUM_DATA_POINTS,DATA_TO_PLOT
 
   from datetime import datetime
+  from os import system
 
   print "\033[16;0H\033[0KThis will start a new brew session."
 
@@ -273,24 +294,26 @@ def get_brew_info():
 
   yeast_profile()
 
-  database_file = open("database.csv", "a")
-
+  database_file = open("database.csv", "a") #open database to append data
+#write new brew data to database
   database_file.write(str(BREW_NAME)+", "+str(BREW_BATCH_NUM)+", "+str(BREW_BATCH_SIZE)+", "+str(BREW_STYLE)+", "+
                       str(BREW_METHOD)+", "+str(Y_PROF_ID)+", "+str(Y_NAME)+"\n")
 
-  database_file.close()
+  database_file.close() #close the database file
 
-  BREW_CYCLE = "Off  "
+  BREW_CYCLE = "Off  " #brew cycle gets turned off... must start it with Normal or Warm menu options
 
-  reset_min_max()
-  DATA_TO_PLOT = False
-  NUM_DATA_POINTS = 0
-  PLOT_STARTED = False
+  reset_min_max() #reset min and max temperature variables 
+  DATA_TO_PLOT = False #reset the data to plot variable
+  NUM_DATA_POINTS = 0 #reset the data points
+  PLOT_STARTED = False #resetthe plot started variable
 
-
+#reset the brew session name
   BREW_SESSION_FILENAME = './data/'+BREW_NAME + '-' + BREW_BATCH_NUM + '-' + str(BREW_BATCH_SIZE) + '-' + BREW_STYLE + '-' + BREW_METHOD
 
-  init_gnuplot_script()
+  system("pkill -9 gnuplot")#kill any gnuplot charts
+
+  init_gnuplot_script()#rewrite the gnuplot script with the new brew session data
 
   return
 
@@ -365,7 +388,7 @@ def yeast_profile():
     WARM_TEMP = Y_LOW_TEMP + ((Y_HIGH_TEMP - Y_LOW_TEMP)/2.0) + ((Y_HIGH_TEMP - Y_LOW_TEMP)/4.0)
 
 
-  if BREW_CYCLE == 'Norm ': DESIRED_TEMP = NORM_TEMP
+  if BREW_CYCLE == 'Norm ': DESIRED_TEMP = NORM_TEMP #set the desired temperature
   elif BREW_CYCLE == 'Warm ' : DESIRED_TEMP = WARM_TEMP
 
   MAX_HIGH_TEMP = WARM_TEMP + DWELL
@@ -406,7 +429,7 @@ def switch_scale():
     current_temperature = (current_temperature -32) * 5.0 / 9.0
 
 
-  if USE_CELSIUS:
+  if USE_CELSIUS: #convert all the temperatures
     LAGER_TEMP = (LAGER_TEMP -32) * 5.0 / 9.0
     WARM_TEMP = (WARM_TEMP -32) * 5.0 / 9.0
     NORM_TEMP = (NORM_TEMP -32) * 5.0 / 9.0
@@ -419,7 +442,7 @@ def switch_scale():
     Y_HIGH_TEMP = (Y_HIGH_TEMP - 32) * 5.0 / 9.0
     DWELL = (DWELL)*5.0/9.0
 
-  else:
+  else: #convert all the temperatures
     LAGER_TEMP = (LAGER_TEMP * 9.0/5.0) + 32
     WARM_TEMP = (WARM_TEMP * 9.0/5.0) + 32
     NORM_TEMP = (NORM_TEMP * 9.0/5.0) + 32
@@ -440,9 +463,9 @@ def switch_scale():
 def brew_off():
   global BREW_CYCLE,DESIRED_TEMP,MAX_HIGH_TEMP,MIN_LOW_TEMP,USE_CELSIUS,TIME_LAST_COOLER,COOLER_ON
 
-  if BREW_CYCLE == "Off ": pass
+  if BREW_CYCLE == "Off ": pass #if brew cycle is off do nothing
   else:
-    BREW_CYCLE = "Off  "
+    BREW_CYCLE = "Off  " #else turn brew session off
     if COOLER_ON:
       COOLER_ON = False
       GPIO.output("P9_23",GPIO.LOW)
@@ -458,7 +481,7 @@ def brew_off():
     MAX_HIGH_TEMP = 75
     MIN_LOW_TEMP = 34
 
-  display_alarm()
+  display_alarm()#update the alarm display
 
   return
 
@@ -584,7 +607,6 @@ def set_alarm_thresholds():
     except:
       print "Enter a numeric value"
 
-
   while True:
     print "\033[17;0H\033[0K\033[16;0H"
     try:
@@ -668,7 +690,7 @@ def exit_program():
 def check_alarms():
   global IS_ALARM,ALARM_HIGH_TEMP,ALARM_LOW_TEMP,ALARM_COOLER_MALFUNC,ALARM_HEATER_MALFUNC, MAX_HIGH_TEMP,MIN_LOW_TEMP,TIME_BEFORE_ALARM_TRIGGER,BREW_CYCLE,ALARM_SYS_ON
 
-#exit function if program has just started
+#exit function if program has just started - need to wait 60 seconds
   if time.time() - PROGRAM_START_TIME < 60:
     print "\033[24;26H\033[93mOFF\033[39m"
     print "\033[24;36H\033[93mOFF\033[39m"
@@ -680,7 +702,7 @@ def check_alarms():
     print "\033[24;36HOFF\033[39m"
     return
 
-  if BREW_CYCLE == "Off  ": #if brew cycle is off
+  if BREW_CYCLE == "Off  ": #if brew cycle is off don't display alarms on screen
     IS_ALARM = False
     ALARM_LOW_TEMP = False
     ALARM_HIGH_TEMP = False
@@ -703,7 +725,7 @@ def check_alarms():
   else:
     ALARM_LOW_TEMP = False
     ALARM_HIGH_TEMP = False
-    IS_ALARM =False
+    IS_ALARM = False
 
 #alarm function should check if cooler or heater is running and if temp is adjusting over time accordingly
 
@@ -1045,7 +1067,7 @@ def draw_screen():
   print "\033[25;77H\033[0K |  Cell: "+CELL_NUMBER
   print "\033[26;77H\033[0K |  "+str(datetime.now().strftime("%Y-%m-%d %H:%M"))
   print "\033[27;77H\033[0K |  Charts: "
-  print "\033[28;77H\033[0K |            "
+  print "\033[28;77H\033[0K |  "+str(PLOT_STARTED)+str(DATA_TO_PLOT)
 
   print "\033[29;0H\033[0K YEAST PROFILE"
   print "\033[30;0H\033[0K",Y_PROF_ID,"|",Y_LAB,"|",Y_NUM,"|",Y_NAME,"|",Y_STYLE,"|",round(Y_LOW_TEMP,1),"|",round(Y_HIGH_TEMP,1)
@@ -1084,11 +1106,17 @@ def print_output():
     print "\033[27;77H\033[0K |  Charts: ON - "+str(CHARTING_INTERVAL/60)
   else: print "\033[27;77H\033[0K |  Charts: OFF"
 
+  print "\033[28;77H\033[0K |  "+str(PLOT_STARTED)+" "+str(DATA_TO_PLOT)
+
   print "\033[24;88H\033[0K",round(DWELL,1)
 
 
   print "\033[30;0H\033[0K",Y_PROF_ID,"|",Y_LAB,"|",Y_NUM,"|",Y_NAME,"|",Y_STYLE,"|",round(Y_LOW_TEMP,1),"|",round(Y_HIGH_TEMP,1)
   print "\033[31;0H\033[0K",Y_DESC
+
+  print "\033[33;0H\033[0K BREW INFO"
+  print "\033[34;0H\033[0K",BREW_NAME,"|",BREW_BATCH_NUM,"|",BREW_BATCH_SIZE,"|",BREW_STYLE,"|",BREW_METHOD
+
 
   return
 
@@ -1104,10 +1132,10 @@ def init_gnuplot_script():
 
   LAST_BREW_SESSION_TIME = 0
 
-  #decide what range to use for the y axis - use the larger value
+  #decide what range to use for the y axis - use the lower temperature
   if Y_LOW_TEMP < MIN_TEMP: low_scale_temp = round(Y_LOW_TEMP,2)
   else: low_scale_temp = round(MIN_TEMP,2)
-
+  #decide what range to use for the y axis - use the higher temperature
   if Y_HIGH_TEMP > MAX_TEMP: high_scale_temp = round(Y_HIGH_TEMP,2)
   else: high_scale_temp = round(MAX_TEMP,2)
 
@@ -1205,12 +1233,12 @@ def write_gnuplot_script():
 
   from datetime import datetime
 
-  if not PLOT_STARTED and DATA_TO_PLOT:
+  if not PLOT_STARTED and DATA_TO_PLOT: #if the plot hasn't been started and there is data to plot
     from threading import Thread
-    t = Thread(target=gnuplot_thread,args=())
-    t.start()
-    PLOT_STARTED = True
-  
+    t = Thread(target=gnuplot_thread,args=())#create a thread
+    t.start()#start a thread
+    draw_screen()#redraw the screen to get rid of the gnuplot error 
+      
   if time.time() - PROGRAM_START_TIME < 60: #wait for avg temp to stabilize
     return
 
@@ -1223,7 +1251,10 @@ def write_gnuplot_script():
   gnuplot_script_data_file = open(BREW_SESSION_FILENAME+".dat", "a")#open the brew session database
 
 #log timestamp, current avg temp, min temp, and max temp to data file
-  gnuplot_script_data_file.write(str(datetime.now().strftime("%Y-%m-%d %H:%M")) + "," + str(round(O_trending.moving_avg_temp,4)) + "," + str(round(MIN_TEMP,4)) + "," + str(round(MAX_TEMP,4)) + "," + str(round(DESIRED_TEMP,4))+ "," + str(round(MAX_HIGH_TEMP,4)) + "," + str(round(MIN_LOW_TEMP,4)) +"\n")
+  gnuplot_script_data_file.write(str(datetime.now().strftime("%Y-%m-%d %H:%M")) + "," + 
+                                 str(round(O_trending.moving_avg_temp,4)) + "," + str(round(MIN_TEMP,4)) + "," +
+                                 str(round(MAX_TEMP,4)) + "," + str(round(DESIRED_TEMP,4))+ "," +
+                                 str(round(MAX_HIGH_TEMP,4)) + "," + str(round(MIN_LOW_TEMP,4)) +"\n")
 
   gnuplot_script_data_file.close()#close the data file
 
@@ -1400,18 +1431,37 @@ column 17: temperature scale
 
 # gnuplot_thread() #######################################################
 def gnuplot_thread():
-  global DATA_TO_PLOT
+  global DATA_TO_PLOT,PLOT_STARTED
 
   from os import system
 
-  while not DATA_TO_PLOT:
+  while not DATA_TO_PLOT: #wait for at least 2 data points
     time.sleep(60)
 
-  system( '/usr/bin/gnuplot \''+BREW_SESSION_FILENAME+'.gp\'')
+  PLOT_STARTED = True
+  print_output()
+  system( '/usr/bin/gnuplot \''+BREW_SESSION_FILENAME+'.gp\'') #call gnupot and pass it the file name
 
   return
 
 ########### MAIN PROGRAM STARTS HERE #####################################
+TEMP_SCALE = "Fahrenheit"
+#read in the settings file
+try:
+  from bccconfig import *
+#  __import__(bccconfig)
+except ImportError:
+  CELL_NUMBER = str(input("Enter your cell phone number:"))
+  write_settings()
+
+if TEMP_SCALE == "Celsius": #from import bccconfig above
+  USE_CELSIUS = True
+
+else:
+  TEMP_SCALE = "Fahrenheit"
+  USE_CELSIUS = False
+
+
 self_test()
 
 draw_screen()
