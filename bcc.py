@@ -24,8 +24,13 @@
 """
 
 #import the libraries we will use in our program
-import Adafruit_BBIO.ADC as ADC
-import Adafruit_BBIO.GPIO as GPIO
+try:
+  import Adafruit_BBIO.ADC as ADC
+  import Adafruit_BBIO.GPIO as GPIO
+except ImportError:
+  print "bcc.py needs adafruit bbio library installed"
+  exit(1)
+
 import time
 import math
 import sys
@@ -33,7 +38,7 @@ import select
 import csv
 import os
 
-######### GLOBAL VARIABLE START HERE ##############################
+######### GLOBAL VARIABLES START HERE ##############################
 # Some of the global variables are written to bccconfig.py and imported
 # during the main program code at the bottom of this file.
 # There is no need to change any of these global defaults at the start
@@ -42,11 +47,11 @@ import os
 # The exception might be the CELL_NUMBER variable - change that to your cell number
 # but you could just as easily change it in bccconfig.py itself once it is created.
 
-CELL_NUMBER = '5555555555'
+#CELL_NUMBER = '5555555555'
 
 #set version number
 #major release . minor release . bugfix
-VERSION = "v0.07.5a"
+VERSION = "v0.07.12a"
 
 #set Celsius to kelvin constant
 c2kelvin = 273.15
@@ -141,7 +146,83 @@ GPIO.setup("P9_23", GPIO.OUT) #setup pin P9_49 as output pin COOLER
 
 ######### AUTOMATION FUNCTIONS #####################################
 
-#none yet
+#none yet - getting close
+
+#propose the use of a cascading PID using three thermowells, one in the wort, 
+#one near the heating device, and one in the freezer nearest the coldest part 
+#(if there is such a place).
+
+#The interaction between the wort thermowell and either the heating or cooling 
+#thermocouple will control when the heating or cooling device turn on and off.
+
+#The difference between the wort temperature and either the heating or cooling 
+#temperature will be used in a loop control in the cascading PID so as not to over/under-shoot the desired wort temperature.
+
+"""
+       SIMPLE METHOD - KISS
+           pseudo code
+
+  measure the wort temperature
+  measure the air temperature (of the chamber)
+
+  if wort temp is greater that desired temperature + wort deadband: #small value - set by user
+    adjust air deadband based on wort/air/desired temperatures/time cooler has been on
+    #as the differences become smaller so does the air deadband value (to a point?)
+    #at some point we decide we have a good air deadband to maintain a stable wort temperature)
+    if air temp is greater than desired temperature - air deadband: #adjusted by program - needs to be cooler than wort
+      if cooler off:
+        turn cooler on
+      else: check for a malfunction?
+    else:
+      if cooler on:
+        turn cooler off #air temperature is cooler than desired - let wort come down to temperature
+
+  elif wort temp is less than desired temperature - wort deadband (small value - set by user)
+    adjust air deadband based on wort/air/desired temperatures/time heater has been on
+    #as the differences become smaller so does the air deadband value (to a point?)
+    #at some point we decide we have a good air deadband to maintain a stable wort temperature
+    if air temp is less that desired temperature + air deadband #adjusted by program - needs to be warmer than wort
+      if the heater is off
+        turn heater on
+      else check for a malfunction?
+    else:
+      if heater on:
+        turn heater off #air temp is warmer than desired - let wort come up to temperature
+
+  else: #make sure heater and cooler are off
+    if cooler on:
+      turn cooler off
+    if heater on:
+      turn heater off
+
+"""
+
+"""
+Cascade control (from wikipedia)
+
+One distinctive advantage of PID controllers is that two PID controllers can be used together to yield better dynamic
+performance. This is called cascaded PID control. In cascade control there are two PIDs arranged with one PID controlling the
+setpoint of another. A PID controller acts as outer loop controller, which controls the primary physical parameter, such as
+fluid level or velocity. The other controller acts as inner loop controller, which reads the output of outer loop controller
+as setpoint, usually controlling a more rapid changing parameter, flowrate or acceleration. It can be mathematically proven 
+that the working frequency of the controller is increased and the time constant of the object is reduced by using cascaded PID
+controllers.
+
+For example, a temperature-controlled circulating bath has two PID controllers in cascade, each with its own thermocouple
+temperature sensor. The outer controller controls the temperature of the water using a thermocouple located far from the
+heater where it accurately reads the temperature of the bulk of the water. The error term of this PID controller is the
+difference between the desired bath temperature and measured temperature. Instead of controlling the heater directly, the
+outer PID controller sets a heater temperature goal for the inner PID controller. The inner PID controller controls the
+temperature of the heater using a thermocouple attached to the heater. The inner controller's error term is the difference
+between this heater temperature setpoint and the measured temperature of the heater. Its output controls the actual heater to
+stay near this setpoint.
+
+The proportional, integral and differential terms of the two controllers will be very different. The outer PID controller has
+a long time constant - all the water in the tank needs to heat up or cool down. The inner loop responds much more quickly.
+Each controller can be tuned to match the physics of the system it controls - heat transfer and thermal mass of the whole
+tank or of just the heater - giving better total response.
+
+"""
 
 ######### USER INPUT FUNCTIONS #####################################
 
@@ -164,7 +245,9 @@ def check_input():
       set_dwell()
 
     if key_input[0] == 'f' or key_input[0] == 'F':
-      draw_screen()
+      pass
+      #draw_screen() #it will get done below
+      #print_output() #it will get done below
 
     if key_input[0] == 'g' or key_input[0] == 'G':
       chart_graphics()
@@ -279,7 +362,7 @@ def get_brew_info():
   while True:
     print "\033[17;0H\033[0K\033[16;0H"
     try:
-      BREW_STYLE = raw_input("Enter brew style: ")
+      BREW_STYLE = raw_input("Enter brew style: ")#ale, lager, stout, etc
       break
     except:
       print "Enter brew style"
@@ -287,10 +370,10 @@ def get_brew_info():
   while True:
     print "\033[17;0H\033[0K\033[16;0H"
     try:
-      BREW_METHOD = raw_input("Enter brew method: ")
+      BREW_METHOD = raw_input("Enter brew method: ")#all grain, extract, brew in a bag, etc
       break
     except:
-      print "Enter brew name"
+      print "Enter brew method"
 
   yeast_profile()
 
@@ -329,10 +412,10 @@ def yeast_profile():
 
   #read in the yeast csv file and store it in a tuple (array of arrays)
   try:
-    with open('Yeast Strains.csv') as f:
-      ytuple=[tuple(line) for line in csv.reader(f)]
+    with open('Yeast Strains.csv') as f: #open yeast strain file
+      ytuple=[tuple(line) for line in csv.reader(f)]#for every line in file store each csv in an array cell in the tuple
   except:
-    print "\033[17;0HError reading file"
+    print "\033[17;0HError reading Yeast Strain file"
     return
 
   while True:
@@ -626,7 +709,7 @@ def set_dwell():
   while True:
     print "\033[16;0H"
     try:
-      DWELL = input("Enter dwell: ")
+      DWELL = input("Enter deadband: ")
       break
     except:
       print "Enter a numerical value"
@@ -672,7 +755,7 @@ def exit_program():
 
   database_file = open("database.csv", "a")
 
-  database_file.write("bcc.py exiting normally: " + str(datetime.now()) + "\n")
+  database_file.write("bcc.py exiting normally: " + str(datetime.now().strftime("%y-%m-%d %H:%M:%S")) + "\n")
 
   database_file.close()
 
@@ -1028,7 +1111,7 @@ def draw_screen():
   print "\033[6;0H-----------------------=MENU=---------------------"
   print "\033[7;0H| S - Scale(C/F) | A - Alarms    | C - Clear     |"     
   print "\033[8;0H| T - Set Temp   | B - New Brew  | L - Lager     |"
-  print "\033[9;0H| D - Set Dwell  | F - Refresh   | N - Normal    |"
+  print "\033[9;0H| D - Deadband   | F - Refresh   | N - Normal    |"
   print "\033[10;0H| Y - Yeast Prof | G - Graphics  | O - Off       |"
   print "\033[11;0H|                |               | R - Crash     |"
   print "\033[12;0H|                |               | W - Warm      |"
@@ -1036,7 +1119,7 @@ def draw_screen():
   print "\033[14;0H|                | X - Exit      |               |"
   print "\033[15;0H====================[         ]==================="
 
-  print "\033[23;0H\033[0K--=Brew Status=--"
+  print "\033[23;0H\033[0K --=Brew Status=--"
   print "\033[24;0H\033[0K Brew Cycle:     "
   print "\033[25;0H\033[0K Cooler:         "
   print "\033[26;0H\033[0K Heater:         "
@@ -1050,7 +1133,7 @@ def draw_screen():
   print "\033[27;20H\033[0K|  Low Temp:   OFF"
   print "\033[28;20H\033[0K|  Malfunc:    OFF"
 
-  print "\033[23;39H\033[0K | -----------------=System Status=-------------------"
+  print "\033[23;39H\033[0K |  --------------------=System Status=-------------------"
   print "\033[24;39H\033[0K |  Dsrd Temp:        "
   print "\033[25;39H\033[0K |  Crnt Temp:        "
   print "\033[26;39H\033[0K |  Trend:            "
@@ -1063,11 +1146,11 @@ def draw_screen():
   print "\033[27;61H\033[0K |  T4:       "
   print "\033[28;61H\033[0K |  MAvg:     "
 
-  print "\033[24;77H\033[0K |  Dwell:    "
+  print "\033[24;77H\033[0K |  Deadband: "
   print "\033[25;77H\033[0K |  Cell: "+CELL_NUMBER
   print "\033[26;77H\033[0K |  "+str(datetime.now().strftime("%Y-%m-%d %H:%M"))
   print "\033[27;77H\033[0K |  Charts: "
-  print "\033[28;77H\033[0K |  "+str(PLOT_STARTED)+str(DATA_TO_PLOT)
+#  print "\033[28;77H\033[0K |  "+str(PLOT_STARTED)+str(DATA_TO_PLOT)
 
   print "\033[29;0H\033[0K YEAST PROFILE"
   print "\033[30;0H\033[0K",Y_PROF_ID,"|",Y_LAB,"|",Y_NUM,"|",Y_NAME,"|",Y_STYLE,"|",round(Y_LOW_TEMP,1),"|",round(Y_HIGH_TEMP,1)
@@ -1106,9 +1189,9 @@ def print_output():
     print "\033[27;77H\033[0K |  Charts: ON - "+str(CHARTING_INTERVAL/60)
   else: print "\033[27;77H\033[0K |  Charts: OFF"
 
-  print "\033[28;77H\033[0K |  "+str(PLOT_STARTED)+" "+str(DATA_TO_PLOT)
+  print "\033[28;77H\033[0K |"#  "+str(PLOT_STARTED)+" "+str(DATA_TO_PLOT)
 
-  print "\033[24;88H\033[0K",round(DWELL,1)
+  print "\033[24;90H\033[0K",round(DWELL,1)
 
 
   print "\033[30;0H\033[0K",Y_PROF_ID,"|",Y_LAB,"|",Y_NUM,"|",Y_NAME,"|",Y_STYLE,"|",round(Y_LOW_TEMP,1),"|",round(Y_HIGH_TEMP,1)
@@ -1171,7 +1254,7 @@ def init_gnuplot_script():
 
   gnuplot_script_file.close()
 
-  gnuplot_script_data_file = open(BREW_SESSION_FILENAME+".dat", "w")#create the brew session database
+  gnuplot_script_data_file = open(BREW_SESSION_FILENAME+".dat", "w")#create the brew session gnuplot script
   gnuplot_script_data_file.close()
 
   return
@@ -1224,7 +1307,7 @@ def update_gnuplot_script():
   return
 
 #write brew session data to file ####################################################
-def write_gnuplot_script():
+def write_gnuplot_data():
   global LAST_BREW_SESSION_TIME,DATA_TO_PLOT,NUM_DATA_POINTS,PLOT_STARTED
 
 
@@ -1238,6 +1321,10 @@ def write_gnuplot_script():
     t = Thread(target=gnuplot_thread,args=())#create a thread
     t.start()#start a thread
     draw_screen()#redraw the screen to get rid of the gnuplot error 
+    print_output()#reprint data
+    display_alarm()
+    cooler_control(O_trending.moving_avg_temp)
+    heater_control(O_trending.moving_avg_temp)
       
   if time.time() - PROGRAM_START_TIME < 60: #wait for avg temp to stabilize
     return
@@ -1248,7 +1335,7 @@ def write_gnuplot_script():
   if BREW_CYCLE == "Off  ":#No need to update session data if crew cycle is off
     return
 
-  gnuplot_script_data_file = open(BREW_SESSION_FILENAME+".dat", "a")#open the brew session database
+  gnuplot_script_data_file = open(BREW_SESSION_FILENAME+".dat", "a")#open the brew session gnuplot data file
 
 #log timestamp, current avg temp, min temp, and max temp to data file
   gnuplot_script_data_file.write(str(datetime.now().strftime("%Y-%m-%d %H:%M")) + "," + 
@@ -1315,9 +1402,9 @@ def init_database():
 
   from datetime import datetime
 
-  database_file = open("database.csv", "a")
+  database_file = open("database.csv", "a") #open database to append info
 
-  database_file.write("bcc.py " + str(VERSION) + " started: " + str(datetime.now()) + "\n")
+  database_file.write("bcc.py " + str(VERSION) + " started: " + str(datetime.now().strftime("%y-%m-%d %H:%M:%S")) + "\n")
   database_file.write(str(BREW_NAME)+", "+str(BREW_BATCH_NUM)+", "+str(BREW_BATCH_SIZE)+", "+str(BREW_STYLE)+", "+
                       str(BREW_METHOD)+", "+str(Y_PROF_ID)+", "+str(Y_NAME)+"\n")
 
@@ -1365,7 +1452,8 @@ column 17: temperature scale
 
   """
 
-  database_file.write(str(datetime.now()) + "," + str(BREW_CYCLE) + "," + str(round(O_trending.moving_avg_temp,4)) + "," + 
+  database_file.write(str(datetime.now().strftime("%y-%m-%d %H:%M:%S")) + "," + str(BREW_CYCLE) + "," + 
+                      str(round(O_trending.moving_avg_temp,4)) + "," + 
                       str(round(MIN_TEMP,4)) + "," + str(round(MAX_TEMP,4)) + "," + 
                       str(round(MIN_LOW_TEMP)) + "," + str(round(MAX_HIGH_TEMP)) + "," + str(Y_PROF_ID) + "," + 
                       str(HEATER_ON) + "," + str(COOLER_ON) + "," + str(ALARM_SYS_ON) + "," + 
@@ -1416,7 +1504,8 @@ column 17: temperature scale
 
   """
 
-  database_file.write(str(datetime.now()) + "," + str(BREW_CYCLE) + "," + str(round(O_trending.moving_avg_temp,4)) + "," + 
+  database_file.write(str(datetime.now().strftime("%y-%m-%d %H:%M:%S")) + "," + str(BREW_CYCLE) + "," + 
+                      str(round(O_trending.moving_avg_temp,4)) + "," + 
                       str(round(MIN_TEMP,4)) + "," + str(round(MAX_TEMP,4)) + "," + 
                       str(round(MIN_LOW_TEMP)) + "," + str(round(MAX_HIGH_TEMP)) + "," + str(Y_PROF_ID) + "," + 
                       str(HEATER_ON) + "," + str(COOLER_ON) + "," + str(ALARM_SYS_ON) + "," + 
@@ -1449,7 +1538,6 @@ TEMP_SCALE = "Fahrenheit"
 #read in the settings file
 try:
   from bccconfig import *
-#  __import__(bccconfig)
 except ImportError:
   CELL_NUMBER = str(input("Enter your cell phone number:"))
   write_settings()
@@ -1502,7 +1590,7 @@ while _input > 0:
     write_database()
 
     #write the brew session data to the data file
-    write_gnuplot_script()
+    write_gnuplot_data()
 
     #update brew session gnuplot script
     update_gnuplot_script()

@@ -3,8 +3,6 @@ A list of things to do for the bcc project. The number in parenthesis is the pri
 * (1)Bug Fixes
 	- X Fix Celsius to Fahrenheit formula
 
-* (1)Break bcc.py into multiple files or at least move functions so they are organized by relationship
-
 * (2)Work on trend
 	- _  Work on better algorithm for trend analysis
 
@@ -32,8 +30,8 @@ A list of things to do for the bcc project. The number in parenthesis is the pri
 	- X  BREW_CYCLE
 	- X  ALARM_SYS_ON
 	- X  SMS_ALARM_ON
-	- _  BREW_NAME
-	- _  BREW_STYLE
+	- X  BREW_NAME
+	- X  BREW_STYLE
 
 
 * (2)Database
@@ -57,9 +55,9 @@ A list of things to do for the bcc project. The number in parenthesis is the pri
 	- _ CO2 Sensor/Gas Pressure Sensor
 
 * (3)Chart the Brew Process
-	- X Install gnuplot
-	- _ Save brew session readings in session database
-	- _ Chart brew session
+	- X Install gnuplot-x11
+	- _ Save brew session readings in session database (partially incorporated)
+	- _ Chart brew session (partially incorporated)
 	
 
 
