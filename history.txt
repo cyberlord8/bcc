@@ -1,7 +1,7 @@
 Version History
 ~~~~~~~~~~~~~~~
 
-#0.07.09a (XX Nov 2014)
+#0.07.12a (28 Nov 2014)
 - Commented out code in the screen refresh causing screen to be refreshed twice
 - Added SOME error checking code - about time
 - Fixed display problem where alarm and cooler/heater status were not shown after the graph was displayed
