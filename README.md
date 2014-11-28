@@ -29,7 +29,7 @@ SELECTING AND AUTOMATING THE PROCESS
         ( )Private access for control of the process
         ( )Public access for monitoring the process 
         (*)SSH
-	(*)VNC
+        (*)VNC
     (*)Alarm system sends texts/emails/tweets etc. 
     (*)CSV database to track history/store yeast statistics etc.
     (*)Plot charts of brew session data
